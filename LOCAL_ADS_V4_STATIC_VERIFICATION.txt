@@ -1,0 +1,61 @@
+LOCAL ADS V4 STATIC VERIFICATION
+Generated: 2026-06-15T17:40:43Z
+
+TypeScript:
+
+> typecheck
+> tsc --noEmit
+
+
+Campaign creation route Cloudinary validation:
+8:import { ensureCampaignCoreSchema, ensureCampaignWorkflowSchema } from '@/lib/feature-schema';
+42:const cloudinaryImageUrlSchema = z.string().trim().min(1).refine(
+64:    imageUrl: cloudinaryImageUrlSchema,
+146:    await ensureCampaignCoreSchema();
+177:        status: 'pending_approval',
+
+Campaign pages use Cloudinary upload box:
+src/app/dashboard/campaigns/[id]/edit/page.tsx:8:import { CloudinaryUploadBox } from '@/components/ui/cloudinary-upload-box';
+src/app/dashboard/campaigns/[id]/edit/page.tsx:316:              <CloudinaryUploadBox
+src/app/dashboard/campaigns/new/page.tsx:20:import { CloudinaryUploadBox } from "@/components/ui/cloudinary-upload-box";
+src/app/dashboard/campaigns/new/page.tsx:645:                <CloudinaryUploadBox
+src/components/ui/file-upload.tsx:3:import { CloudinaryUploadBox } from './cloudinary-upload-box';
+src/components/ui/file-upload.tsx:26:    <CloudinaryUploadBox
+
+Direct local upload references in campaign pages:
+
+Referral link format:
+src/lib/referrals.ts:98:  return safeCode ? `${safeBaseUrl}/register?ref=${encodeURIComponent(safeCode)}` : '';
+src/app/dashboard/referrals/page.tsx:190:              <p className="text-sm text-purple-700">Every account can generate a link in the format /register?ref=CODE. New signups through this link are counted in your referral analysis.</p>
+src/app/dashboard/referrals/page.tsx:262:              <p className="mt-1 text-xs text-gray-500">Clicks captured when visitors open /register?ref=CODE</p>
+
+Referral admin settings route and schema:
+src/db/schema.ts:941:export const referralProgramSettings = pgTable('referral_program_settings', {
+src/db/schema.ts:952:  index('referral_program_settings_enabled_idx').on(table.enabled),
+src/lib/feature-schema.ts:123:        CREATE TABLE IF NOT EXISTS referral_program_settings (
+src/lib/feature-schema.ts:134:        ALTER TABLE referral_program_settings ADD COLUMN IF NOT EXISTS enabled boolean DEFAULT true NOT NULL;
+src/lib/feature-schema.ts:135:        ALTER TABLE referral_program_settings ADD COLUMN IF NOT EXISTS min_commissionable_amount numeric(12,4) DEFAULT 0.0000 NOT NULL;
+src/lib/feature-schema.ts:136:        ALTER TABLE referral_program_settings ADD COLUMN IF NOT EXISTS max_levels integer DEFAULT 10 NOT NULL;
+src/lib/feature-schema.ts:137:        ALTER TABLE referral_program_settings ADD COLUMN IF NOT EXISTS cookie_days integer DEFAULT 30 NOT NULL;
+src/lib/feature-schema.ts:138:        ALTER TABLE referral_program_settings ADD COLUMN IF NOT EXISTS commission_source varchar(50) DEFAULT 'publisher_earnings' NOT NULL;
+src/lib/feature-schema.ts:139:        ALTER TABLE referral_program_settings ADD COLUMN IF NOT EXISTS updated_by uuid REFERENCES users(id) ON DELETE SET NULL;
+src/lib/feature-schema.ts:140:        ALTER TABLE referral_program_settings ADD COLUMN IF NOT EXISTS created_at timestamp DEFAULT now() NOT NULL;
+src/lib/feature-schema.ts:141:        ALTER TABLE referral_program_settings ADD COLUMN IF NOT EXISTS updated_at timestamp DEFAULT now() NOT NULL;
+src/lib/feature-schema.ts:142:        CREATE INDEX IF NOT EXISTS referral_program_settings_enabled_idx ON referral_program_settings (enabled);
+src/lib/feature-schema.ts:144:        INSERT INTO referral_program_settings (enabled, min_commissionable_amount, max_levels, cookie_days, commission_source)
+src/lib/feature-schema.ts:146:        WHERE NOT EXISTS (SELECT 1 FROM referral_program_settings);
+src/app/api/admin/referral-settings/route.ts:4:import { referralProgramSettings } from '@/db/schema';
+src/app/api/admin/referral-settings/route.ts:48:    const [updated] = await db.update(referralProgramSettings)
+src/app/api/admin/referral-settings/route.ts:60:      .where(eq(referralProgramSettings.id, existing.id))
+src/app/dashboard/admin-referrals/page.tsx:58:          fetch('/api/admin/referral-settings'),
+src/app/dashboard/admin-referrals/page.tsx:108:      const settingsResponse = await fetch('/api/admin/referral-settings', {
+
+Navigation exposes referrals for all roles:
+src/components/layout/sidebar.tsx:47:    { href: '/dashboard/admin-referrals', label: 'Referral Settings', icon: Gift },
+src/components/layout/sidebar.tsx:48:    { href: '/dashboard/referrals', label: 'My Referral Link', icon: Link2 },
+src/components/layout/sidebar.tsx:62:    { href: '/dashboard/referrals', label: 'Referrals', icon: Gift },
+src/components/layout/sidebar.tsx:74:    { href: '/dashboard/referrals', label: 'Referrals', icon: Gift },
+src/components/layout/header.tsx:42:        { href: '/dashboard/admin-referrals', label: 'Referral Settings' },
+src/components/layout/header.tsx:43:        { href: '/dashboard/referrals', label: 'My Referral Link' },
+src/components/layout/header.tsx:62:        { href: '/dashboard/referrals', label: 'Referrals' },
+src/components/layout/header.tsx:95:        { href: '/dashboard/referrals', label: 'Referrals' },

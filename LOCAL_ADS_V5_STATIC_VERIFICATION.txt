@@ -1,0 +1,18 @@
+LOCAL ADS V5 STATIC VERIFICATION
+Generated: 2026-06-17
+
+PASS - campaign core transaction contains only campaign/ad insert
+PASS - campaign create uses pending_approval enum
+PASS - campaign create returns diagnostic hint
+PASS - runtime schema creates campaigns table if missing
+PASS - runtime schema creates ads table if missing
+PASS - workflow enum repair is isolated
+PASS - direct upload route disabled
+PASS - Cloudinary widget uses config/sign routes
+PASS - Cloudinary widget enforces image limits
+PASS - createUser assigns referral code to all roles
+PASS - DB pool is cached in production too
+PASS - SQL v5 creates campaigns table
+PASS - SQL v5 creates ads table
+PASS - SQL v5 repairs referral codes
+PASS - SQL v5 admin referral settings

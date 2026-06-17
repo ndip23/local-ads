@@ -1,0 +1,19 @@
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - npm ci
+    build:
+      commands:
+        # Amplify SSR builds need server-side env values available during build/runtime packaging.
+        - env | grep -e DATABASE_URL -e JWT_SECRET -e NEXT_PUBLIC_BASE_URL >> .env.production || true
+        - npm run build
+  artifacts:
+    baseDirectory: .next
+    files:
+      - '**/*'
+  cache:
+    paths:
+      - node_modules/**/*
+      - .next/cache/**/*

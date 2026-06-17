@@ -1,0 +1,51 @@
+{
+  "name": "nextjs-postgresql-template",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "db:push": "npx drizzle-kit push",
+    "db:seed": "npx tsx src/scripts/seed.ts",
+    "aws:build": "npm ci && npm run build",
+    "aws:zip": "zip -r local-ad-network-aws.zip . -x \"node_modules/*\" -x \".git/*\" -x \".next/cache/*\""
+  },
+  "dependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/uuid": "^10.0.0",
+    "bcryptjs": "^3.0.3",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.1.0",
+    "dotenv": "17.3.1",
+    "drizzle-orm": "0.45.2",
+    "jose": "^6.2.3",
+    "lucide-react": "^1.14.0",
+    "next": "16.2.5",
+    "pg": "8.20.0",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "recharts": "^3.8.1",
+    "tailwind-merge": "^3.5.0",
+    "tsx": "^4.21.0",
+    "uuid": "^14.0.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "4.1.17",
+    "@types/node": "22.19.15",
+    "@types/pg": "8.18.0",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "drizzle-kit": "0.31.10",
+    "eslint": "9.39.4",
+    "eslint-config-next": "16.2.0",
+    "postcss": "8.5.8",
+    "tailwindcss": "4.1.17",
+    "typescript": "5.9.3"
+  },
+  "engines": {
+    "node": ">=20.11.0"
+  }
+}

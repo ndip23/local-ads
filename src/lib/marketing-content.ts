@@ -1,0 +1,116 @@
+export const ctaOptions = [
+  'Learn More',
+  'Shop Now',
+  'Sign Up',
+  'Get Started',
+  'Book Now',
+  'Download',
+  'Apply Now',
+  'Request Quote',
+  'Contact Us',
+  'Subscribe',
+  'Watch Video',
+  'Claim Offer',
+  'Order Now',
+  'Join Today',
+  'Try Free',
+];
+
+export const campaignIdeas = [
+  {
+    label: 'Local service launch',
+    title: 'Get More Local Customers This Week',
+    description: 'Promote a service offer to people already reading trusted local publishers in your target market.',
+    headline: 'Bring More Customers Through Your Door',
+    adDescription: 'Reach nearby buyers with a clear offer, simple CTA, and measurable click tracking.',
+    cta: 'Book Now',
+    niches: ['Business', 'Marketing'],
+  },
+  {
+    label: 'E-commerce product push',
+    title: 'Drive Product Sales From High-Intent Traffic',
+    description: 'Use image-led creative and publisher placements to send interested shoppers directly to your product page.',
+    headline: 'Discover Your Next Favourite Product',
+    adDescription: 'Shop a limited offer today and get fast access before the campaign closes.',
+    cta: 'Shop Now',
+    niches: ['Fashion', 'Lifestyle'],
+  },
+  {
+    label: 'Lead generation campaign',
+    title: 'Generate Qualified Leads With CPC Ads',
+    description: 'Collect enquiries from niche audiences and track conversions with the Local Ads pixel.',
+    headline: 'Ready To Grow? Start With One Click',
+    adDescription: 'Submit your interest and let our team help you choose the right solution.',
+    cta: 'Request Quote',
+    niches: ['Finance', 'Real Estate', 'SaaS'],
+  },
+];
+
+export const blogPosts = [
+  {
+    slug: 'why-local-advertising-still-wins',
+    title: 'Why Local Advertising Still Wins in a Performance Marketing World',
+    date: '2026-06-04',
+    category: 'Strategy',
+    excerpt: 'Local attention is not small attention. It is contextual, trusted and often closer to purchase intent than broad social impressions.',
+    readTime: '5 min read',
+    content: [
+      'Performance marketing is full of dashboards, attribution windows and global reach promises. The weak assumption is that more reach automatically means better reach. It does not. Local advertising still matters because people buy inside real communities, not only inside abstract audience segments.',
+      'A local publisher, community blog, niche news site or neighbourhood platform already has trust that a new advertiser has not earned. When an advert appears in that environment, the advertiser borrows contextual relevance. That is valuable, especially for SMEs, service businesses, education providers, events, real estate offers and location-sensitive products.',
+      'The strategic advantage is simple: match the campaign to a publisher audience that already has a reason to care. A campaign for a Lagos property inspection service should not fight for attention beside random global entertainment content. It should appear where Lagos readers, renters, buyers and business owners already consume relevant information.',
+      'The correct play is not just to buy clicks. It is to buy qualified attention, measure the click quality, block suspicious traffic and improve creative based on conversion behaviour. Local Ads is positioned around that discipline: targeted placement, transparent CPC, publisher earnings and practical tracking.',
+    ],
+  },
+  {
+    slug: 'how-publishers-can-earn-from-quality-traffic',
+    title: 'How Publishers Can Earn More From Quality Traffic Without Selling Their Audience Cheaply',
+    date: '2026-06-04',
+    category: 'Publisher Growth',
+    excerpt: 'Publishers do not need to choose between user trust and revenue. The answer is controlled placements, relevant campaigns and clear earnings data.',
+    readTime: '6 min read',
+    content: [
+      'Many publishers make the same mistake: they treat traffic as a commodity. That is weak positioning. A publisher with a niche audience, consistent readership and trusted content is not merely selling ad space. They are offering access to a defined community.',
+      'The first rule is relevance. If a campaign does not fit the audience, it should not dominate the page. Irrelevant ads damage trust and produce poor clicks. Relevant ads produce better engagement and better long-term advertiser demand.',
+      'The second rule is control. Publishers need to know which campaigns are running, what formats appear, how clicks are counted and when earnings become available. A black-box monetisation model keeps publishers dependent. A transparent model gives them leverage.',
+      'The third rule is quality. Suspicious clicks may look like short-term revenue, but they destroy the network. Serious publishers protect their own reputation by driving real users, honest placements and clean traffic patterns. That is how they qualify for better campaigns and consistent payouts.',
+    ],
+  },
+  {
+    slug: 'campaign-creative-checklist-for-better-cpc-results',
+    title: 'A Practical Campaign Creative Checklist for Better CPC Results',
+    date: '2026-06-04',
+    category: 'Advertiser Playbook',
+    excerpt: 'A CPC campaign fails fast when the offer is vague, the landing page is weak or the CTA does not match user intent.',
+    readTime: '7 min read',
+    content: [
+      'A campaign does not become profitable because the platform has a dashboard. The offer, creative, landing page and targeting must work together. Most CPC waste starts before the advert is even approved.',
+      'Start with one offer. Do not advertise a whole company when the user needs one clear reason to click. A strong campaign headline promises a specific outcome, saving, product, event, service or opportunity.',
+      'Use one primary CTA. “Learn More” is safe but often lazy. “Book Now”, “Request Quote”, “Shop Now”, “Apply Now” or “Claim Offer” can perform better when they match the real next step. The CTA must prepare the user for what happens after the click.',
+      'Match creative to placement. A banner image should be readable in small formats. A video should communicate the core offer within the first few seconds. The preview should be checked before publishing, because distorted creative damages credibility instantly.',
+      'Finally, track everything. If a campaign cannot separate clicks from conversions, it is only guessing. Use conversion pixels, country CPC settings, daily budgets and fraud review to keep spend disciplined.',
+    ],
+  },
+];
+
+export const firstCaseStudy = {
+  title: 'How a Local Retail Advertiser Could Use Publisher Traffic to Generate Measurable Leads',
+  subtitle: 'A practical first Local Ads case study model for retail, service and SME campaigns.',
+  client: 'Illustrative SME campaign',
+  industry: 'Retail and local services',
+  timeline: '30 days',
+  objective: 'Drive qualified traffic from niche local publisher placements to a landing page and measure click-to-lead activity.',
+  challenge: 'The advertiser had an offer but no reliable way to reach relevant local audiences outside social media noise. The risk was spending on broad impressions that looked good but produced low-quality clicks.',
+  approach: [
+    'Built a focused CPC campaign with one landing page, one clear offer and a practical CTA.',
+    'Selected publisher niches that matched the buying context instead of chasing generic reach.',
+    'Used country CPC targeting to control spend and avoid wasted markets.',
+    'Installed the tracking pixel to connect clicks with lead actions.',
+    'Reviewed suspicious patterns so publisher earnings stayed tied to quality traffic.',
+  ],
+  outcomes: [
+    'Cleaner campaign structure with measurable traffic sources.',
+    'Better control over daily spend and total budget exposure.',
+    'Clearer publisher value because placements were tied to clicks and conversion intent.',
+    'A repeatable model for advertisers that need leads rather than vanity impressions.',
+  ],
+};
