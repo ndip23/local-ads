@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { db } from '@/db';
-import { countryRates } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { connectToMongo, CountryRate } from '@/db/mongo';
 import { getSession, requireRole } from '@/lib/auth';
 
 const updateRateSchema = z.object({
@@ -22,6 +20,8 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    await connectToMongo();
+
     const { id } = await params;
     const body = await request.json();
     const validated = updateRateSchema.parse(body);
@@ -30,15 +30,16 @@ export async function PATCH(
       updatedAt: new Date(),
     };
 
-    if (validated.defaultCpc !== undefined) updateData.defaultCpc = validated.defaultCpc.toFixed(4);
-    if (validated.publisherShare !== undefined) updateData.publisherShare = validated.publisherShare.toFixed(2);
-    if (validated.platformShare !== undefined) updateData.platformShare = validated.platformShare.toFixed(2);
+    if (validated.defaultCpc !== undefined) updateData.defaultCpc = validated.defaultCpc;
+    if (validated.publisherShare !== undefined) updateData.publisherShare = validated.publisherShare;
+    if (validated.platformShare !== undefined) updateData.platformShare = validated.platformShare;
     if (validated.active !== undefined) updateData.active = validated.active;
 
-    const [updatedRate] = await db.update(countryRates)
-      .set(updateData)
-      .where(eq(countryRates.id, id))
-      .returning();
+    const updatedRate = await CountryRate.findByIdAndUpdate(
+      id,
+      { $set: updateData },
+      { new: true }
+    ).lean();
 
     return NextResponse.json({
       success: true,
@@ -69,9 +70,11 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    await connectToMongo();
+
     const { id } = await params;
 
-    await db.delete(countryRates).where(eq(countryRates.id, id));
+    await CountryRate.findByIdAndDelete(id);
 
     return NextResponse.json({ success: true });
   } catch (error) {

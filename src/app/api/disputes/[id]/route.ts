@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { db } from '@/db';
-import { disputes, moduleActivityLogs, notifications } from '@/db/schema';
-import { eq } from 'drizzle-orm';
 import { getSession, requireRole } from '@/lib/auth';
+import { connectToMongo, Dispute, ModuleActivityLog, Notification, User, DisputeMessage } from '@/db/mongo';
 
 const updateDisputeSchema = z.object({
   status: z.enum(['open', 'under_review', 'resolved', 'rejected', 'closed']).optional(),
@@ -23,27 +21,26 @@ export async function GET(
     }
 
     const { id } = await params;
-    const dispute = await db.query.disputes.findFirst({
-      where: eq(disputes.id, id),
-      with: {
-        creator: { columns: { id: true, email: true, firstName: true, lastName: true, role: true } },
-        assignee: { columns: { id: true, email: true, firstName: true, lastName: true, role: true } },
-        messages: {
-          with: { sender: { columns: { id: true, email: true, firstName: true, lastName: true, role: true } } },
-          orderBy: (messages, { asc }) => [asc(messages.createdAt)],
-        },
-      },
-    });
+    await connectToMongo();
 
+    const dispute = await Dispute.findById(id).lean();
     if (!dispute) {
       return NextResponse.json({ error: 'Dispute not found' }, { status: 404 });
     }
 
-    if (session.role !== 'admin' && dispute.createdBy !== session.userId && dispute.assignedTo !== session.userId) {
+    if (session.role !== 'admin' && String(dispute.createdBy) !== String(session.userId) && String(dispute.assignedTo) !== String(session.userId)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    return NextResponse.json({ dispute });
+    const userIds = [dispute.createdBy, dispute.assignedTo].filter(Boolean).map(String);
+    const users = userIds.length ? await User.find({ _id: { $in: userIds } }).select('email firstName lastName role').lean() : [];
+
+    const creator = users.find((u: any) => String(u._id) === String(dispute.createdBy)) || null;
+    const assignee = users.find((u: any) => String(u._id) === String(dispute.assignedTo)) || null;
+
+    const messages = await DisputeMessage.find({ disputeId: dispute._id }).sort({ createdAt: 1 }).lean();
+
+    return NextResponse.json({ dispute: { ...dispute, creator, assignee, messages } });
   } catch (error) {
     console.error('Get dispute error:', error);
     return NextResponse.json({ error: 'Failed to fetch dispute' }, { status: 500 });
@@ -64,29 +61,28 @@ export async function PATCH(
     const body = await request.json();
     const validated = updateDisputeSchema.parse(body);
 
-    const existing = await db.query.disputes.findFirst({
-      where: eq(disputes.id, id),
-    });
+    await connectToMongo();
+    const existing = await Dispute.findById(id).lean();
 
     if (!existing) {
       return NextResponse.json({ error: 'Dispute not found' }, { status: 404 });
     }
 
-    const isOwner = existing.createdBy === session.userId;
+    const isOwner = String(existing.createdBy) === String(session.userId);
     const isAdmin = requireRole(session, ['admin']);
 
     if (!isAdmin && !isOwner) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const updateData: Record<string, unknown> = { updatedAt: new Date() };
+    const updateData: any = { updatedAt: new Date() };
 
     if (isAdmin) {
       if (validated.status) updateData.status = validated.status;
       if (validated.priority) updateData.priority = validated.priority;
       if (validated.resolution !== undefined) updateData.resolution = validated.resolution;
-      if (validated.assignedTo !== undefined) updateData.assignedTo = validated.assignedTo;
-      if (validated.status === 'resolved' || validated.status === 'rejected' || validated.status === 'closed') {
+      if (validated.assignedTo !== undefined) updateData.assignedTo = validated.assignedTo || null;
+      if (['resolved', 'rejected', 'closed'].includes(validated.status || '')) {
         updateData.resolvedAt = new Date();
       }
     } else {
@@ -98,25 +94,24 @@ export async function PATCH(
       }
     }
 
-    const [updated] = await db.update(disputes).set(updateData).where(eq(disputes.id, id)).returning();
+    const updated = await Dispute.findByIdAndUpdate(id, updateData, { new: true }).lean();
 
-
-    await db.insert(moduleActivityLogs).values({
+    await ModuleActivityLog.create({
       moduleKey: 'disputes',
       userId: session.userId,
       entityType: 'dispute',
       entityId: id,
       action: 'dispute_updated',
-      metadata: { status: updated.status, priority: updated.priority, resolution: updated.resolution || null },
+      metadata: { status: updated?.status, priority: updated?.priority, resolution: updated?.resolution || null },
     });
 
-    if (isAdmin && updated.createdBy) {
-      await db.insert(notifications).values({
+    if (isAdmin && updated?.createdBy) {
+      await Notification.create({
         userId: updated.createdBy,
         type: 'system',
         title: 'Dispute updated',
-        message: `${updated.disputeNumber} is now ${updated.status.replace(/_/g, ' ')}.`,
-        metadata: { disputeId: updated.id, disputeNumber: updated.disputeNumber },
+        message: `${updated.disputeNumber} is now ${updated.status?.replace(/_/g, ' ')}.`,
+        metadata: { disputeId: updated._id, disputeNumber: updated.disputeNumber },
       });
     }
 

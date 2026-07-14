@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { db } from '@/db';
-import { publisherSites } from '@/db/schema';
-import { eq, desc } from 'drizzle-orm';
+import { connectToMongo, PublisherSite } from '@/db/mongo';
 import { getSession, requireRole } from '@/lib/auth';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -20,10 +18,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const sites = await db.query.publisherSites.findMany({
-      where: eq(publisherSites.userId, session.userId),
-      orderBy: [desc(publisherSites.createdAt)],
-    });
+    await connectToMongo();
+
+    const sites = await PublisherSite.find({ userId: session.userId })
+      .sort({ createdAt: -1 })
+      .lean();
 
     return NextResponse.json({ sites });
   } catch (error) {
@@ -42,6 +41,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    await connectToMongo();
+
     const body = await request.json();
     const validated = createSiteSchema.parse(body);
 
@@ -51,9 +52,7 @@ export async function POST(request: NextRequest) {
     domain = domain.split('/')[0]; // Remove path
 
     // Check if domain already exists
-    const existing = await db.query.publisherSites.findFirst({
-      where: eq(publisherSites.domain, domain),
-    });
+    const existing = await PublisherSite.findOne({ domain }).lean();
 
     if (existing) {
       return NextResponse.json(
@@ -65,7 +64,7 @@ export async function POST(request: NextRequest) {
     // Generate verification token
     const verificationToken = `lan-verify-${uuidv4().replace(/-/g, '').substring(0, 16)}`;
 
-    const [site] = await db.insert(publisherSites).values({
+    const site = await PublisherSite.create({
       userId: session.userId,
       domain,
       name: validated.name || domain,
@@ -73,11 +72,11 @@ export async function POST(request: NextRequest) {
       monthlyPageviews: validated.monthlyPageviews,
       verificationToken,
       verificationMethod: 'meta_tag',
-    }).returning();
+    });
 
     return NextResponse.json({
       success: true,
-      site,
+      site: site.toObject(),
       verification: {
         method: 'meta_tag',
         token: verificationToken,

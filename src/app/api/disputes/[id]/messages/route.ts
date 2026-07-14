@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { db } from '@/db';
-import { disputeMessages, disputes, moduleActivityLogs } from '@/db/schema';
-import { eq } from 'drizzle-orm';
 import { getSession } from '@/lib/auth';
+import { connectToMongo, Dispute, DisputeMessage, ModuleActivityLog } from '@/db/mongo';
 
 const createMessageSchema = z.object({
   message: z.string().trim().min(2),
@@ -29,14 +27,15 @@ export async function POST(
     const body = await request.json();
     const validated = createMessageSchema.parse(body);
 
-    const dispute = await db.query.disputes.findFirst({ where: eq(disputes.id, id) });
+    await connectToMongo();
+    const dispute = await Dispute.findById(id).lean();
     if (!dispute) {
       return NextResponse.json({ error: 'Dispute not found' }, { status: 404 });
     }
 
     const isAdmin = session.role === 'admin';
-    const isOwner = dispute.createdBy === session.userId;
-    const isAssignee = dispute.assignedTo === session.userId;
+    const isOwner = String(dispute.createdBy) === String(session.userId);
+    const isAssignee = String(dispute.assignedTo) === String(session.userId);
 
     if (!isAdmin && !isOwner && !isAssignee) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
@@ -46,15 +45,15 @@ export async function POST(
       return NextResponse.json({ error: 'Only admins can add internal dispute notes' }, { status: 403 });
     }
 
-    const [message] = await db.insert(disputeMessages).values({
-      disputeId: id,
+    const message = await DisputeMessage.create({
+      disputeId: dispute._id,
       senderId: session.userId,
       message: validated.message,
       attachments: validated.attachments || [],
       internalNote: validated.internalNote || false,
-    }).returning();
+    });
 
-    await db.insert(moduleActivityLogs).values({
+    await ModuleActivityLog.create({
       moduleKey: 'disputes',
       userId: session.userId,
       entityType: 'dispute',

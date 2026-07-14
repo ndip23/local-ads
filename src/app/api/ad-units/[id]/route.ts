@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { db } from '@/db';
-import { adUnits } from '@/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { connectToMongo, AdUnit } from '@/db/mongo';
 import { getSession, requireRole } from '@/lib/auth';
 
 const updateAdUnitSchema = z.object({
@@ -33,11 +31,11 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    await connectToMongo();
+
     const { id } = await params;
 
-    const adUnit = await db.query.adUnits.findFirst({
-      where: and(eq(adUnits.id, id), eq(adUnits.userId, session.userId)),
-    });
+    const adUnit = await AdUnit.findOne({ _id: id, userId: session.userId }).lean();
 
     if (!adUnit) {
       return NextResponse.json({ error: 'Ad unit not found' }, { status: 404 });
@@ -63,13 +61,13 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    await connectToMongo();
+
     const { id } = await params;
     const body = await request.json();
     const validated = updateAdUnitSchema.parse(body);
 
-    const existing = await db.query.adUnits.findFirst({
-      where: and(eq(adUnits.id, id), eq(adUnits.userId, session.userId)),
-    });
+    const existing = await AdUnit.findOne({ _id: id, userId: session.userId }).lean();
 
     if (!existing) {
       return NextResponse.json({ error: 'Ad unit not found' }, { status: 404 });
@@ -83,10 +81,11 @@ export async function PATCH(
       }
     });
 
-    const [updatedAdUnit] = await db.update(adUnits)
-      .set(updateData)
-      .where(eq(adUnits.id, id))
-      .returning();
+    const updatedAdUnit = await AdUnit.findByIdAndUpdate(
+      id,
+      { $set: updateData },
+      { new: true }
+    ).lean();
 
     return NextResponse.json({
       success: true,
@@ -117,17 +116,17 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    await connectToMongo();
+
     const { id } = await params;
 
-    const existing = await db.query.adUnits.findFirst({
-      where: and(eq(adUnits.id, id), eq(adUnits.userId, session.userId)),
-    });
+    const existing = await AdUnit.findOne({ _id: id, userId: session.userId }).lean();
 
     if (!existing) {
       return NextResponse.json({ error: 'Ad unit not found' }, { status: 404 });
     }
 
-    await db.delete(adUnits).where(eq(adUnits.id, id));
+    await AdUnit.findByIdAndDelete(id);
 
     return NextResponse.json({ success: true });
   } catch (error) {

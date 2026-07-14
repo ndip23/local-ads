@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { db } from '@/db';
-import { campaigns, ads, adTargeting, pixels, approvalRequests, campaignTargetingRules, moduleActivityLogs } from '@/db/schema';
-import { eq, desc, and } from 'drizzle-orm';
 import { getSession, requireRole } from '@/lib/auth';
 import { generateTrackingCode } from '@/lib/utils';
 import { ensureCampaignCoreSchema, ensureCampaignWorkflowSchema } from '@/lib/feature-schema';
+import { connectToMongo, Campaign, Ad, AdTargeting, Pixel, ApprovalRequest, CampaignTargetingRule, ModuleActivityLog } from '@/db/mongo';
+
 
 function generateApprovalNumber() {
   const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
@@ -107,42 +106,38 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '10');
     const offset = (page - 1) * limit;
 
-    let whereClause;
+    await connectToMongo();
 
+    const filter: any = {};
     if (session.role === 'admin') {
-      whereClause = status ? eq(campaigns.status, status as typeof campaigns.status.enumValues[number]) : undefined;
+      if (status) filter.status = status;
     } else if (session.role === 'advertiser') {
-      whereClause = status
-        ? and(eq(campaigns.advertiserId, session.userId), eq(campaigns.status, status as typeof campaigns.status.enumValues[number]))
-        : eq(campaigns.advertiserId, session.userId);
+      filter.advertiserId = session.userId;
+      if (status) filter.status = status;
     } else {
-      whereClause = eq(campaigns.status, 'active');
+      filter.status = 'active';
     }
 
-    const campaignsList = await db.query.campaigns.findMany({
-      where: whereClause,
-      with: {
-        ads: true,
-        targeting: true,
-        advertiser: {
-          columns: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-          },
-        },
-      },
-      orderBy: [desc(campaigns.createdAt)],
-      limit,
-      offset,
-    });
+    const campaignsList = await Campaign.find(filter).sort({ createdAt: -1 }).skip(offset).limit(limit).lean();
 
-    return NextResponse.json({
-      campaigns: campaignsList,
-      page,
-      limit,
-    });
+    // Batch load ads and targeting
+    const campaignIds = campaignsList.map((c: any) => c._id);
+    const adsByCampaign = await Ad.find({ campaignId: { $in: campaignIds } }).lean();
+    const targetingByCampaign = await AdTargeting.find({ campaignId: { $in: campaignIds } }).lean();
+    const advertisers = await Promise.all(campaignsList.map(async (c: any) => {
+      // minimal advertiser info
+      return { id: String(c.advertiserId) };
+    }));
+
+    const campaignsWithExtras = campaignsList.map((c: any) => ({
+      ...c,
+      id: String(c._id),
+      ads: adsByCampaign.filter((a: any) => String(a.campaignId) === String(c._id)),
+      targeting: targetingByCampaign.filter((t: any) => String(t.campaignId) === String(c._id)),
+      advertiser: { id: String(c.advertiserId) },
+    }));
+
+    return NextResponse.json({ campaigns: campaignsWithExtras, page, limit });
   } catch (error) {
     console.error('Get campaigns error:', error);
     return NextResponse.json(
@@ -164,7 +159,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validated = createCampaignSchema.parse(body);
     const targeting = normalizeTargeting(validated.targeting);
-
     if (validated.dailyBudget > validated.totalBudget) {
       return NextResponse.json(
         { error: 'Daily budget cannot be greater than total budget' },
@@ -179,107 +173,69 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await db.transaction(async (tx) => {
-      const [campaign] = await tx.insert(campaigns).values({
-        advertiserId: session.userId,
-        title: validated.title,
-        description: validated.description,
-        landingPageUrl: validated.landingPageUrl,
-        totalBudget: validated.totalBudget.toFixed(2),
-        dailyBudget: validated.dailyBudget.toFixed(2),
-        startDate: validated.startDate ? new Date(validated.startDate) : null,
-        endDate: validated.endDate ? new Date(validated.endDate) : null,
-        niches: validated.niches || [],
-        status: 'pending_approval',
-      }).returning();
+    await connectToMongo();
 
-      const [ad] = await tx.insert(ads).values({
-        campaignId: campaign.id,
-        title: validated.ad.title,
-        description: validated.ad.description,
-        videoUrl: validated.ad.videoUrl,
-        imageUrl: validated.ad.imageUrl,
-        ctaText: validated.ad.ctaText || 'Learn More',
-        status: 'pending',
-      }).returning();
-
-      return { campaign, ad };
+    // Create campaign and ad
+    const campaign = await Campaign.create({
+      advertiserId: session.userId,
+      title: validated.title,
+      description: validated.description,
+      landingPageUrl: validated.landingPageUrl,
+      totalBudget: validated.totalBudget,
+      dailyBudget: validated.dailyBudget,
+      startDate: validated.startDate ? new Date(validated.startDate) : null,
+      endDate: validated.endDate ? new Date(validated.endDate) : null,
+      niches: validated.niches || [],
+      status: 'pending_approval',
     });
 
-    // This must stay outside the core transaction. In PostgreSQL, a caught
-    // error inside a transaction still marks the transaction as aborted, which
-    // was one of the reasons the UI kept reporting "Failed to create campaign".
+    const ad = await Ad.create({
+      campaignId: campaign._id,
+      title: validated.ad.title,
+      description: validated.ad.description,
+      videoUrl: validated.ad.videoUrl,
+      imageUrl: validated.ad.imageUrl,
+      ctaText: validated.ad.ctaText || 'Learn More',
+      status: 'pending',
+    });
+
+    // Targeting side-effect (non-critical)
     if (targeting.length > 0) {
       try {
-        await db.insert(adTargeting).values(
-          targeting.map((target) => ({
-            campaignId: result.campaign.id,
-            country: target.country,
-            cpc: target.cpc.toFixed(4),
-          }))
-        );
+        await AdTargeting.insertMany(targeting.map((t) => ({ campaignId: campaign._id, country: t.country, cpc: t.cpc })));
       } catch (targetingError) {
         console.error('Campaign targeting side-effect error:', targetingError);
       }
     }
 
-    const targetingRules: Array<typeof campaignTargetingRules.$inferInsert> = [];
-
+    const targetingRules: any[] = [];
     for (const niche of validated.niches || []) {
-      targetingRules.push({
-        campaignId: result.campaign.id,
-        ruleType: 'niche',
-        include: true,
-        weight: 100,
-        metadata: { niche },
-      });
+      targetingRules.push({ campaignId: campaign._id, ruleType: 'niche', include: true, weight: 100, metadata: { niche } });
     }
-
     for (const target of targeting) {
-      targetingRules.push({
-        campaignId: result.campaign.id,
-        ruleType: 'country',
-        include: true,
-        weight: 100,
-        metadata: { country: target.country, cpc: target.cpc },
-      });
+      targetingRules.push({ campaignId: campaign._id, ruleType: 'country', include: true, weight: 100, metadata: { country: target.country, cpc: target.cpc } });
     }
 
     try {
       await ensureCampaignWorkflowSchema();
-
       if (targetingRules.length > 0) {
-        await db.insert(campaignTargetingRules).values(targetingRules);
+        await CampaignTargetingRule.insertMany(targetingRules);
       }
 
-      await db.insert(approvalRequests).values({
+      await ApprovalRequest.create({
         approvalNumber: generateApprovalNumber(),
         moduleKey: 'approvals',
         entityType: 'campaign',
-        entityId: result.campaign.id,
+        entityId: campaign._id,
         requestedBy: session.userId,
-        subject: `Campaign approval: ${result.campaign.title}`,
+        subject: `Campaign approval: ${campaign.title}`,
         notes: 'Automatically created when the campaign was submitted for admin approval.',
-        metadata: { campaignId: result.campaign.id, totalBudget: result.campaign.totalBudget, dailyBudget: result.campaign.dailyBudget },
+        metadata: { campaignId: campaign._id, totalBudget: campaign.totalBudget, dailyBudget: campaign.dailyBudget },
       });
 
-      await db.insert(moduleActivityLogs).values([
-        {
-          moduleKey: 'approvals',
-          userId: session.userId,
-          entityType: 'campaign',
-          entityId: result.campaign.id,
-          action: 'campaign_submitted_for_approval',
-          metadata: { title: result.campaign.title },
-        },
-        {
-          moduleKey: 'targeting',
-          userId: session.userId,
-          entityType: 'campaign',
-          entityId: result.campaign.id,
-          action: 'campaign_targeting_configured',
-          metadata: { niches: validated.niches || [], targeting },
-        },
+      await ModuleActivityLog.insertMany([
+        { moduleKey: 'approvals', userId: session.userId, entityType: 'campaign', entityId: campaign._id, action: 'campaign_submitted_for_approval', metadata: { title: campaign.title } },
+        { moduleKey: 'targeting', userId: session.userId, entityType: 'campaign', entityId: campaign._id, action: 'campaign_targeting_configured', metadata: { niches: validated.niches || [], targeting } },
       ]);
     } catch (workflowError) {
       console.error('Campaign workflow side-effect error:', workflowError);
@@ -288,23 +244,12 @@ export async function POST(request: NextRequest) {
     let pixelCode: string | null = null;
     try {
       pixelCode = generateTrackingCode();
-      await db.insert(pixels).values({
-        campaignId: result.campaign.id,
-        advertiserId: session.userId,
-        name: 'Default Pixel',
-        pixelCode,
-        conversionType: 'lead',
-      });
+      await Pixel.create({ campaignId: campaign._id, advertiserId: session.userId, name: 'Default Pixel', pixelCode, conversionType: 'lead' });
     } catch (pixelError) {
       console.error('Default pixel creation error:', pixelError);
     }
 
-    return NextResponse.json({
-      success: true,
-      campaign: result.campaign,
-      ad: result.ad,
-      pixelCode,
-    });
+    return NextResponse.json({ success: true, campaign: { ...campaign.toObject(), id: String(campaign._id) }, ad: { ...ad.toObject(), id: String(ad._id) }, pixelCode });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(

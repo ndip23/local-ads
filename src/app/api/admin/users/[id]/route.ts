@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { db } from '@/db';
-import { users, notifications, publisherSites } from '@/db/schema';
-import { eq } from 'drizzle-orm';
 import { getSession, requireRole } from '@/lib/auth';
+import { connectToMongo, User, Wallet, AdvertiserProfile, PublisherProfile, Campaign, PublisherSite, Notification } from '@/db/mongo';
 
 const updateUserSchema = z.object({
   status: z.enum(['pending', 'active', 'suspended', 'banned']).optional(),
@@ -21,31 +19,20 @@ export async function GET(
     }
 
     const { id } = await params;
+    await connectToMongo();
 
-    const user = await db.query.users.findFirst({
-      where: eq(users.id, id),
-      with: {
-        wallet: true,
-        advertiserProfile: true,
-        publisherProfile: true,
-        campaigns: true,
-      },
-      columns: {
-        passwordHash: false,
-      },
-    });
+    const user = await User.findById(id).lean();
+    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
+    const wallet = await Wallet.findOne({ userId: user._id }).lean();
+    const advertiserProfile = await AdvertiserProfile.findOne({ userId: user._id }).lean();
+    const publisherProfile = await PublisherProfile.findOne({ userId: user._id }).lean();
+    const campaigns = await Campaign.find({ advertiserId: user._id }).lean();
 
-    const sites = user.role === 'publisher'
-      ? await db.query.publisherSites.findMany({
-          where: eq(publisherSites.userId, id),
-        })
-      : [];
+    const sites = user.role === 'publisher' ? await PublisherSite.find({ userId: user._id }).lean() : [];
 
-    return NextResponse.json({ user: { ...user, publisherSites: sites } });
+    delete user.passwordHash;
+    return NextResponse.json({ user: { ...user, wallet, advertiserProfile, publisherProfile, campaigns, publisherSites: sites } });
   } catch (error) {
     console.error('Get user error:', error);
     return NextResponse.json(
@@ -69,30 +56,16 @@ export async function PATCH(
     const body = await request.json();
     const validated = updateUserSchema.parse(body);
 
-    const existingUser = await db.query.users.findFirst({
-      where: eq(users.id, id),
-    });
+    await connectToMongo();
+    const existingUser = await User.findById(id).lean();
+    if (!existingUser) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
-    if (!existingUser) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
-
-    const updateData: Record<string, unknown> = {
-      updatedAt: new Date(),
-    };
-
+    const updateData: any = { updatedAt: new Date() };
     if (validated.status) updateData.status = validated.status;
     if (validated.role) updateData.role = validated.role;
 
-    const [updatedUser] = await db.update(users)
-      .set(updateData)
-      .where(eq(users.id, id))
-      .returning({
-        id: users.id,
-        email: users.email,
-        role: users.role,
-        status: users.status,
-      });
+    await User.updateOne({ _id: id }, { $set: updateData });
+    const updatedUser = await User.findById(id).select('id email role status').lean();
 
     // Notify user of status change
     if (validated.status && validated.status !== existingUser.status) {
@@ -103,19 +76,11 @@ export async function PATCH(
       };
 
       if (statusMessages[validated.status]) {
-        await db.insert(notifications).values({
-          userId: id,
-          type: validated.status === 'active' ? 'system' : 'account_suspended',
-          title: `Account ${validated.status.charAt(0).toUpperCase() + validated.status.slice(1)}`,
-          message: statusMessages[validated.status],
-        });
+        await Notification.create({ userId: id, type: validated.status === 'active' ? 'system' : 'account_suspended', title: `Account ${validated.status.charAt(0).toUpperCase() + validated.status.slice(1)}`, message: statusMessages[validated.status] });
       }
     }
 
-    return NextResponse.json({
-      success: true,
-      user: updatedUser,
-    });
+    return NextResponse.json({ success: true, user: updatedUser });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(

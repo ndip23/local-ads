@@ -13,10 +13,10 @@ export async function GET() {
       );
     }
 
-    let referralCode = user.referralCode || '';
+    let referralCode = (user as any).referralCode || '';
     if (!referralCode) {
       try {
-        referralCode = await ensureUserReferralCode(user.id);
+        referralCode = await ensureUserReferralCode((user as any).id);
       } catch (referralError) {
         console.error('Referral code auto-generation error:', referralError);
       }
@@ -24,22 +24,22 @@ export async function GET() {
 
     return NextResponse.json({
       user: {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        status: user.status,
-        firstName: user.firstName,
-        lastName: user.lastName,
+        id: (user as any).id,
+        email: (user as any).email,
+        role: (user as any).role,
+        status: (user as any).status,
+        firstName: (user as any).firstName,
+        lastName: (user as any).lastName,
         referralCode,
-        wallet: user.wallet ? {
-          balance: user.wallet.balance,
-          pendingBalance: user.wallet.pendingBalance,
-          totalEarnings: user.wallet.totalEarnings,
-          totalSpent: user.wallet.totalSpent,
+        wallet: (user as any).wallet ? {
+          balance: (user as any).wallet.balance,
+          pendingBalance: (user as any).wallet.pendingBalance,
+          totalEarnings: (user as any).wallet.totalEarnings,
+          totalSpent: (user as any).wallet.totalSpent,
         } : null,
-        profile: user.role === 'advertiser' 
-          ? user.advertiserProfile 
-          : user.publisherProfile,
+        profile: (user as any).role === 'advertiser'
+          ? (user as any).advertiserProfile
+          : (user as any).publisherProfile,
       },
     });
   } catch (error) {

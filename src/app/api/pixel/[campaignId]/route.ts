@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/db';
-import { campaigns, pixels } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { connectToMongo, Pixel, Campaign } from '@/db/mongo';
 import { generateTrackingCode } from '@/lib/utils';
 import { ensureCampaignWorkflowSchema } from '@/lib/feature-schema';
 
@@ -16,27 +14,23 @@ export async function GET(
   try {
     const { campaignId } = await params;
 
+    await connectToMongo();
     await ensureCampaignWorkflowSchema();
 
-    let pixel = await db.query.pixels.findFirst({
-      where: eq(pixels.campaignId, campaignId),
-    });
+    let pixel = await Pixel.findOne({ campaignId }).lean();
 
     if (!pixel) {
-      const campaign = await db.query.campaigns.findFirst({
-        where: eq(campaigns.id, campaignId),
-        columns: { id: true, advertiserId: true },
-      });
+      const campaign = await Campaign.findById(campaignId).select('advertiserId').lean();
 
       if (campaign) {
-        const [createdPixel] = await db.insert(pixels).values({
-          campaignId: campaign.id,
+        const created = await Pixel.create({
+          campaignId: campaign._id,
           advertiserId: campaign.advertiserId,
           name: 'Default Pixel',
           pixelCode: generateTrackingCode(),
           conversionType: 'lead',
-        }).returning();
-        pixel = createdPixel;
+        });
+        pixel = created.toObject();
       }
     }
 
@@ -59,7 +53,7 @@ export async function GET(
   LAN.cookieName = 'lan_click_id';
 
   function getCookie(name) {
-    var match = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/([.$?*|{}()\\[\\]\\/\\+^])/g, '\\$1') + '=([^;]*)'));
+    var match = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/([.$?*|{}()\\\\[\\\\]\\\\/\\\\+^])/g, '\\\\$1') + '=([^;]*)'));
     return match ? decodeURIComponent(match[1]) : null;
   }
 

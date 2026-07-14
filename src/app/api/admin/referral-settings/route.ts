@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { db } from '@/db';
-import { referralProgramSettings } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { connectToMongo, ReferralProgramSettings } from '@/db/mongo';
 import { getSession, requireRole } from '@/lib/auth';
 import { ensureReferralFeatureSchema } from '@/lib/feature-schema';
 import { getReferralProgramSettings } from '@/lib/referrals';
@@ -39,26 +37,25 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    await connectToMongo();
     await ensureReferralFeatureSchema();
 
     const body = await request.json().catch(() => ({}));
     const validated = settingsSchema.parse(body);
     const existing = await getReferralProgramSettings();
 
-    const [updated] = await db.update(referralProgramSettings)
-      .set({
-        enabled: validated.enabled ?? existing.enabled,
-        minCommissionableAmount: validated.minCommissionableAmount !== undefined
-          ? validated.minCommissionableAmount.toFixed(4)
-          : existing.minCommissionableAmount,
-        maxLevels: validated.maxLevels ?? existing.maxLevels,
-        cookieDays: validated.cookieDays ?? existing.cookieDays,
-        commissionSource: validated.commissionSource ?? existing.commissionSource,
-        updatedBy: session.userId,
-        updatedAt: new Date(),
-      })
-      .where(eq(referralProgramSettings.id, existing.id))
-      .returning();
+    const updateData: Record<string, unknown> = { updatedAt: new Date() };
+    if (validated.enabled !== undefined) updateData.enabled = validated.enabled;
+    if (validated.minCommissionableAmount !== undefined) updateData.minCommissionableAmount = validated.minCommissionableAmount;
+    if (validated.maxLevels !== undefined) updateData.maxLevels = validated.maxLevels;
+    if (validated.cookieDays !== undefined) updateData.cookieDays = validated.cookieDays;
+    if (validated.commissionSource !== undefined) updateData.commissionSource = validated.commissionSource;
+
+    const updated = await ReferralProgramSettings.findByIdAndUpdate(
+      existing._id,
+      { $set: updateData },
+      { new: true }
+    ).lean();
 
     return NextResponse.json({ success: true, settings: updated });
   } catch (error) {

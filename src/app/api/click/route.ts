@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/db';
-import { ads, clicks, campaigns, countryRates, wallets, transactions, notifications } from '@/db/schema';
-import { eq, and, sql } from 'drizzle-orm';
+import { connectToMongo, Ad, Click, Campaign, CountryRate, Wallet, Transaction, Notification } from '@/db/mongo';
 import { checkForFraud, logFraudFlag } from '@/lib/fraud-detection';
 import { parseUserAgent } from '@/lib/utils';
 import { awardReferralCommissions } from '@/lib/referrals';
@@ -26,24 +24,12 @@ export async function GET(request: NextRequest) {
     }
 
     // Get ad and campaign
-    const ad = await db.query.ads.findFirst({
-      where: eq(ads.id, adId),
-      with: {
-        campaign: true,
-      },
-    });
-
-    if (!ad || !ad.campaign) {
-      return NextResponse.json(
-        { error: 'Ad not found' },
-        { status: 404 }
-      );
-    }
-
-    // Check if campaign is active
-    if (ad.campaign.status !== 'active') {
-      return NextResponse.redirect(ad.campaign.landingPageUrl);
-    }
+    await connectToMongo();
+    const ad = await Ad.findById(adId).lean();
+    if (!ad) return NextResponse.json({ error: 'Ad not found' }, { status: 404 });
+    const campaign = await Campaign.findById(ad.campaignId).lean();
+    if (!campaign) return NextResponse.json({ error: 'Campaign not found' }, { status: 404 });
+    if (campaign.status !== 'active') return NextResponse.redirect(String(campaign.landingPageUrl));
 
     // Get request details
     const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 
@@ -58,20 +44,18 @@ export async function GET(request: NextRequest) {
     const fraudCheck = await checkForFraud(ip, userAgent, pubId, adId);
 
     // Get country rate
-    const rate = await db.query.countryRates.findFirst({
-      where: eq(countryRates.countryCode, countryCode),
-    });
+    const rate = await CountryRate.findOne({ countryCode: countryCode }).lean();
 
-    const cpc = rate?.defaultCpc ? parseFloat(rate.defaultCpc) : 0.05;
-    const publisherSharePercent = rate?.publisherShare ? parseFloat(rate.publisherShare) : 80;
+    const cpc = rate?.defaultCpc ? Number(rate.defaultCpc) : 0.05;
+    const publisherSharePercent = rate?.publisherShare ? Number(rate.publisherShare) : 80;
     const publisherEarning = (cpc * publisherSharePercent) / 100;
     const platformEarning = cpc - publisherEarning;
 
     // Create click record
-    const [click] = await db.insert(clicks).values({
-      adId,
+    const click = await Click.create({
+      adId: ad._id,
       publisherId: pubId,
-      campaignId: ad.campaign.id,
+      campaignId: campaign._id,
       ipAddress: ip,
       country: countryName,
       countryCode,
@@ -81,134 +65,69 @@ export async function GET(request: NextRequest) {
       userAgent,
       referer,
       status: fraudCheck.isFraud ? 'fraud' : 'valid',
-      cpc: cpc.toString(),
-      publisherEarning: fraudCheck.isFraud ? '0' : publisherEarning.toFixed(4),
-      platformEarning: fraudCheck.isFraud ? '0' : platformEarning.toFixed(4),
+      cpc,
+      publisherEarning: fraudCheck.isFraud ? 0 : publisherEarning,
+      platformEarning: fraudCheck.isFraud ? 0 : platformEarning,
       fraudReason: fraudCheck.isFraud ? fraudCheck.reasons.join('; ') : null,
-    }).returning();
+    });
 
     // If fraud detected, log it
     if (fraudCheck.isFraud) {
-      await logFraudFlag(
-        click.id,
-        pubId,
-        ip,
-        fraudCheck.reasons,
-        fraudCheck.severity,
-        { userAgent, referer, adId }
-      );
+      await logFraudFlag(String(click._id), pubId, ip, fraudCheck.reasons, fraudCheck.severity, { userAgent, referer, adId });
 
       // Still redirect, just don't credit
-      return NextResponse.redirect(ad.campaign.landingPageUrl);
+      return NextResponse.redirect(String(campaign.landingPageUrl));
     }
 
     // Update ad click count
-    await db.update(ads)
-      .set({ clicks: sql`${ads.clicks} + 1` })
-      .where(eq(ads.id, adId));
+    await Ad.updateOne({ _id: ad._id }, { $inc: { clicks: 1 } });
 
     // Update campaign spent budget
-    await db.update(campaigns)
-      .set({
-        spentBudget: sql`${campaigns.spentBudget} + ${cpc}`,
-        todaySpent: sql`${campaigns.todaySpent} + ${cpc}`,
-      })
-      .where(eq(campaigns.id, ad.campaign.id));
+    await Campaign.updateOne({ _id: campaign._id }, { $inc: { spentBudget: cpc, todaySpent: cpc } });
 
     // Check if budget is exhausted
-    const updatedCampaign = await db.query.campaigns.findFirst({
-      where: eq(campaigns.id, ad.campaign.id),
-    });
+    const updatedCampaign = await Campaign.findById(campaign._id).lean();
 
     if (updatedCampaign) {
-      const spentBudget = parseFloat(updatedCampaign.spentBudget || '0');
-      const totalBudget = parseFloat(updatedCampaign.totalBudget);
-      const todaySpent = parseFloat(updatedCampaign.todaySpent || '0');
-      const dailyBudget = parseFloat(updatedCampaign.dailyBudget);
+      const spentBudget = Number(updatedCampaign.spentBudget || 0);
+      const totalBudget = Number(updatedCampaign.totalBudget || 0);
+      const todaySpent = Number(updatedCampaign.todaySpent || 0);
+      const dailyBudget = Number(updatedCampaign.dailyBudget || 0);
 
       if (spentBudget >= totalBudget || todaySpent >= dailyBudget) {
-        await db.update(campaigns)
-          .set({ status: 'budget_finished' })
-          .where(eq(campaigns.id, ad.campaign.id));
+        await Campaign.updateOne({ _id: campaign._id }, { $set: { status: 'budget_finished' } });
 
         // Notify advertiser
-        await db.insert(notifications).values({
-          userId: ad.campaign.advertiserId,
-          type: 'budget_low',
-          title: 'Campaign Budget Exhausted',
-          message: `Your campaign "${ad.campaign.title}" has run out of budget.`,
-          metadata: { campaignId: ad.campaign.id },
-        });
+        await Notification.create({ userId: campaign.advertiserId, type: 'budget_low', title: 'Campaign Budget Exhausted', message: `Your campaign "${campaign.title}" has run out of budget.`, metadata: { campaignId: campaign._id } });
       }
     }
 
     // Deduct from advertiser wallet
-    const advertiserWallet = await db.query.wallets.findFirst({
-      where: eq(wallets.userId, ad.campaign.advertiserId),
-    });
+    const advertiserWallet = await Wallet.findOne({ userId: campaign.advertiserId });
 
     if (advertiserWallet) {
-      const newBalance = parseFloat(advertiserWallet.balance) - cpc;
-      await db.update(wallets)
-        .set({
-          balance: newBalance.toFixed(2),
-          totalSpent: sql`${wallets.totalSpent} + ${cpc}`,
-        })
-        .where(eq(wallets.id, advertiserWallet.id));
+      const newBalance = Number(advertiserWallet.balance || 0) - cpc;
+      await Wallet.updateOne({ _id: advertiserWallet._id }, { $set: { balance: newBalance, totalSpent: (advertiserWallet.totalSpent || 0) + cpc, updatedAt: new Date() } });
 
-      await db.insert(transactions).values({
-        walletId: advertiserWallet.id,
-        userId: ad.campaign.advertiserId,
-        type: 'click_spend',
-        amount: (-cpc).toFixed(2),
-        balanceBefore: advertiserWallet.balance,
-        balanceAfter: newBalance.toFixed(2),
-        status: 'completed',
-        description: `Click on ad: ${ad.title}`,
-        referenceId: click.id,
-        referenceType: 'click',
-      });
+      await Transaction.create({ walletId: advertiserWallet._id, userId: campaign.advertiserId, type: 'click_spend', amount: -cpc, balanceBefore: advertiserWallet.balance, balanceAfter: newBalance, status: 'completed', description: `Click on ad: ${ad.title}`, referenceId: click._id, referenceType: 'click' });
     }
 
     // Credit publisher wallet
-    const publisherWallet = await db.query.wallets.findFirst({
-      where: eq(wallets.userId, pubId),
-    });
+    const publisherWallet = await Wallet.findOne({ userId: pubId });
 
     if (publisherWallet) {
-      const newBalance = parseFloat(publisherWallet.balance) + publisherEarning;
-      await db.update(wallets)
-        .set({
-          balance: newBalance.toFixed(2),
-          totalEarnings: sql`${wallets.totalEarnings} + ${publisherEarning}`,
-        })
-        .where(eq(wallets.id, publisherWallet.id));
+      const newBalance = Number(publisherWallet.balance || 0) + publisherEarning;
+      await Wallet.updateOne({ _id: publisherWallet._id }, { $set: { balance: newBalance, totalEarnings: (publisherWallet.totalEarnings || 0) + publisherEarning, updatedAt: new Date() } });
 
-      await db.insert(transactions).values({
-        walletId: publisherWallet.id,
-        userId: pubId,
-        type: 'click_earning',
-        amount: publisherEarning.toFixed(2),
-        balanceBefore: publisherWallet.balance,
-        balanceAfter: newBalance.toFixed(2),
-        status: 'completed',
-        description: `Earning from click on: ${ad.title}`,
-        referenceId: click.id,
-        referenceType: 'click',
-      });
+      await Transaction.create({ walletId: publisherWallet._id, userId: pubId, type: 'click_earning', amount: publisherEarning, balanceBefore: publisherWallet.balance, balanceAfter: newBalance, status: 'completed', description: `Earning from click on: ${ad.title}`, referenceId: click._id, referenceType: 'click' });
 
-      await awardReferralCommissions({
-        sourceUserId: pubId,
-        sourceType: 'click',
-        sourceEarning: publisherEarning,
-        referenceId: click.id,
-      });
+      await awardReferralCommissions({ sourceUserId: pubId, sourceType: 'click', sourceEarning: publisherEarning, referenceId: String(click._id) });
     }
 
     // Redirect to landing page with click_id for conversion tracking
-    const redirectUrl = new URL(ad.campaign.landingPageUrl);
-    redirectUrl.searchParams.set('click_id', click.id);
-    
+    const redirectUrl = new URL(String(campaign.landingPageUrl));
+    redirectUrl.searchParams.set('click_id', String(click._id));
+
     return NextResponse.redirect(redirectUrl.toString());
   } catch (error) {
     console.error('Click tracking error:', error);

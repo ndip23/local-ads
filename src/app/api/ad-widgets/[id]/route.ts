@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/db';
-import { adWidgets } from '@/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { connectToMongo, AdWidget } from '@/db/mongo';
 import { getSession, requireRole } from '@/lib/auth';
 
 export async function DELETE(
@@ -13,8 +11,11 @@ export async function DELETE(
     if (!session || !requireRole(session, ['publisher', 'admin'])) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    await connectToMongo();
+
     const { id } = await params;
-    await db.delete(adWidgets).where(and(eq(adWidgets.id, id), eq(adWidgets.publisherId, session.userId)));
+    await AdWidget.deleteOne({ _id: id, publisherId: session.userId });
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Delete widget error:', error);

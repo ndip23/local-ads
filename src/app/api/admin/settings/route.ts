@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { db } from '@/db';
-import { platformSettings } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { connectToMongo, PlatformSetting } from '@/db/mongo';
 import { getSession, requireRole } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
@@ -12,9 +10,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const settings = await db.query.platformSettings.findMany();
+    await connectToMongo();
+
+    const settings = await PlatformSetting.find().lean();
     const settingsMap: Record<string, string> = {};
-    settings.forEach(s => { settingsMap[s.key] = s.value; });
+    settings.forEach((s: any) => { settingsMap[s.key] = s.value; });
 
     return NextResponse.json({ settings: settingsMap, raw: settings });
   } catch (error) {
@@ -37,19 +37,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    await connectToMongo();
+
     const body = await request.json();
     const validated = settingSchema.parse(body);
 
-    const existing = await db.query.platformSettings.findFirst({
-      where: eq(platformSettings.key, validated.key),
-    });
+    const existing = await PlatformSetting.findOne({ key: validated.key }).lean();
 
     if (existing) {
-      await db.update(platformSettings)
-        .set({ value: validated.value, updatedAt: new Date() })
-        .where(eq(platformSettings.key, validated.key));
+      await PlatformSetting.updateOne(
+        { key: validated.key },
+        { $set: { value: validated.value, updatedAt: new Date() } }
+      );
     } else {
-      await db.insert(platformSettings).values({
+      await PlatformSetting.create({
         key: validated.key,
         value: validated.value,
         description: validated.description,

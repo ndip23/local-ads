@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { eq } from 'drizzle-orm';
-import { db, pool } from '@/db';
-import { users } from '@/db/schema';
+import { connectToMongo, User, ReferralClick } from '@/db/mongo';
 import { normalizeReferralCode } from '@/lib/referrals';
 import { ensureReferralFeatureSchema } from '@/lib/feature-schema';
 
@@ -21,24 +19,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Referral code is required' }, { status: 400 });
     }
 
+    await connectToMongo();
     await ensureReferralFeatureSchema();
 
-    const referrer = await db.query.users.findFirst({
-      where: eq(users.referralCode, referralCode),
-      columns: { id: true },
-    });
+    const referrer = await User.findOne({ referralCode }).select('_id').lean();
 
-    await pool.query(
-      `INSERT INTO referral_clicks (referral_code, referrer_id, ip_address, user_agent, referer)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [
-        referralCode,
-        referrer?.id || null,
-        getClientIp(request),
-        request.headers.get('user-agent'),
-        request.headers.get('referer'),
-      ]
-    );
+    await ReferralClick.create({
+      referralCode,
+      referrerId: referrer?._id || null,
+      ipAddress: getClientIp(request),
+      userAgent: request.headers.get('user-agent'),
+      referer: request.headers.get('referer'),
+    });
 
     return NextResponse.json({ success: true, tracked: true });
   } catch (error) {

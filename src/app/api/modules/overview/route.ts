@@ -1,17 +1,16 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/db';
 import {
-  adTrustSignals,
-  approvalRequests,
-  campaignGeoRules,
-  campaignTargetingRules,
-  geoZones,
-  moduleActivityLogs,
-  moduleFeatureSettings,
-  performanceSnapshots,
-  targetingSegments,
-} from '@/db/schema';
-import { and, desc, eq, or } from 'drizzle-orm';
+  connectToMongo,
+  AdTrustSignal,
+  ApprovalRequest,
+  CampaignGeoRule,
+  CampaignTargetingRule,
+  GeoZone,
+  ModuleActivityLog,
+  ModuleFeatureSettings,
+  PerformanceSnapshot,
+  TargetingSegment,
+} from '@/db/mongo';
 import { getSession } from '@/lib/auth';
 
 export async function GET() {
@@ -21,65 +20,63 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    await connectToMongo();
+
     const role = session.role;
 
-    const features = await db.query.moduleFeatureSettings.findMany({
-      orderBy: (settings, { asc }) => [asc(settings.displayOrder)],
-    });
+    const features = await ModuleFeatureSettings.find()
+      .sort({ displayOrder: 1 })
+      .lean();
 
-    const approvals = await db.query.approvalRequests.findMany({
-      where: role === 'admin'
-        ? undefined
-        : or(eq(approvalRequests.requestedBy, session.userId), eq(approvalRequests.assignedTo, session.userId)),
-      orderBy: [desc(approvalRequests.createdAt)],
-      limit: 20,
-    });
+    const approvalsFilter: any = role === 'admin'
+      ? {}
+      : { $or: [{ requestedBy: session.userId }, { assignedTo: session.userId }] };
 
-    const trustWhere = role === 'admin'
-      ? undefined
-      : eq(adTrustSignals.userId, session.userId);
+    const approvals = await ApprovalRequest.find(approvalsFilter)
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .lean();
 
-    const trustSignals = await db.query.adTrustSignals.findMany({
-      where: trustWhere,
-      orderBy: [desc(adTrustSignals.createdAt)],
-      limit: 20,
-    });
+    const trustFilter: any = role === 'admin' ? {} : { userId: session.userId };
 
-    const performanceWhere = role === 'admin'
-      ? undefined
-      : eq(performanceSnapshots.userId, session.userId);
+    const trustSignals = await AdTrustSignal.find(trustFilter)
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .lean();
 
-    const snapshots = await db.query.performanceSnapshots.findMany({
-      where: performanceWhere,
-      orderBy: [desc(performanceSnapshots.periodEnd)],
-      limit: 20,
-    });
+    const perfFilter: any = role === 'admin' ? {} : { userId: session.userId };
 
-    const zones = await db.query.geoZones.findMany({
-      where: eq(geoZones.active, true),
-      orderBy: (zones, { asc }) => [asc(zones.name)],
-      limit: 50,
-    });
+    const snapshots = await PerformanceSnapshot.find(perfFilter)
+      .sort({ periodEnd: -1 })
+      .limit(20)
+      .lean();
 
-    const segments = await db.query.targetingSegments.findMany({
-      where: role === 'admin'
-        ? undefined
-        : and(eq(targetingSegments.ownerId, session.userId), eq(targetingSegments.active, true)),
-      orderBy: [desc(targetingSegments.createdAt)],
-      limit: 20,
-    });
+    const zones = await GeoZone.find({ active: true })
+      .sort({ name: 1 })
+      .limit(50)
+      .lean();
 
-    const activities = await db.query.moduleActivityLogs.findMany({
-      where: role === 'admin' ? undefined : eq(moduleActivityLogs.userId, session.userId),
-      orderBy: [desc(moduleActivityLogs.createdAt)],
-      limit: 30,
-    });
+    const segFilter: any = role === 'admin'
+      ? {}
+      : { ownerId: session.userId, active: true };
 
-    const campaignGeoRuleCount = await db.select().from(campaignGeoRules).limit(200);
-    const campaignTargetingRuleCount = await db.select().from(campaignTargetingRules).limit(200);
+    const segments = await TargetingSegment.find(segFilter)
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .lean();
+
+    const activityFilter: any = role === 'admin' ? {} : { userId: session.userId };
+
+    const activities = await ModuleActivityLog.find(activityFilter)
+      .sort({ createdAt: -1 })
+      .limit(30)
+      .lean();
+
+    const campaignGeoRuleCount = await CampaignGeoRule.countDocuments();
+    const campaignTargetingRuleCount = await CampaignTargetingRule.countDocuments();
 
     return NextResponse.json({
-      features: features.filter((feature) => role === 'admin' || feature.allowedRoles?.includes(role)),
+      features: features.filter((feature: any) => role === 'admin' || feature.allowedRoles?.includes(role)),
       approvals,
       trustSignals,
       performanceSnapshots: snapshots,
@@ -87,13 +84,13 @@ export async function GET() {
       targetingSegments: segments,
       activity: activities,
       counts: {
-        approvalsPending: approvals.filter((item) => item.status === 'pending').length,
-        trustSignalsOpen: trustSignals.filter((item) => ['open', 'reviewing'].includes(item.status)).length,
+        approvalsPending: approvals.filter((item: any) => item.status === 'pending').length,
+        trustSignalsOpen: trustSignals.filter((item: any) => ['open', 'reviewing'].includes(item.status)).length,
         performanceSnapshots: snapshots.length,
         geoZones: zones.length,
         targetingSegments: segments.length,
-        campaignGeoRules: campaignGeoRuleCount.length,
-        campaignTargetingRules: campaignTargetingRuleCount.length,
+        campaignGeoRules: campaignGeoRuleCount,
+        campaignTargetingRules: campaignTargetingRuleCount,
       },
     });
   } catch (error) {

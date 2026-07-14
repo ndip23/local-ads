@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { db } from '@/db';
-import { users, wallets, advertiserProfiles, publisherProfiles, publisherSites } from '@/db/schema';
-import { eq } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { hashPassword, createToken, setAuthCookie } from '@/lib/auth';
 import { createUniqueReferralCode, normalizeReferralCode } from '@/lib/referrals';
 import { ensureReferralFeatureSchema } from '@/lib/feature-schema';
+import { connectToMongo, User, Wallet, AdvertiserProfile, PublisherProfile, PublisherSite } from '@/db/mongo';
 
 function cleanOptionalString(value?: string | null): string | undefined {
   const trimmed = value?.trim();
@@ -88,23 +86,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    await connectToMongo();
+
     // Check if user exists
-    const existingUser = await db.query.users.findFirst({
-      where: eq(users.email, validated.email.toLowerCase()),
-    });
+    const existingUser = await User.findOne({ email: validated.email.toLowerCase() });
     if (existingUser) {
       return NextResponse.json({ error: 'Email already registered' }, { status: 400 });
     }
 
     // Find referrer if referral code provided
-    let referredById: string | null = null;
+    let referredById: any = null;
     if (validated.referralCode) {
-      const referrer = await db.query.users.findFirst({
-        where: eq(users.referralCode, normalizeReferralCode(validated.referralCode)),
-      });
-      if (referrer) {
-        referredById = referrer.id;
-      }
+      const referrer = await User.findOne({ referralCode: normalizeReferralCode(validated.referralCode) }).select('_id').lean();
+      if (referrer) referredById = referrer._id;
     }
 
     // Generate unique referral code for every user so any user can invite others.
@@ -112,7 +106,7 @@ export async function POST(request: NextRequest) {
 
     const passwordHash = await hashPassword(validated.password);
 
-    const [user] = await db.insert(users).values({
+    const user = await User.create({
       email: validated.email.toLowerCase(),
       passwordHash,
       role: validated.role,
@@ -121,23 +115,24 @@ export async function POST(request: NextRequest) {
       status: 'pending',
       referralCode,
       referredBy: referredById,
-    }).returning();
+      emailVerified: false,
+    });
 
     // Create wallet
-    await db.insert(wallets).values({ userId: user.id, balance: '0.00' });
+    await Wallet.create({ userId: user._id, balance: 0 });
 
     // Create role-specific profile
     if (validated.role === 'advertiser') {
-      await db.insert(advertiserProfiles).values({
-        userId: user.id,
+      await AdvertiserProfile.create({
+        userId: user._id,
         companyName: cleanOptionalString(validated.companyName) || null,
         website: advertiserWebsite || null,
         industry: cleanOptionalString(validated.industry) || null,
         country: cleanOptionalString(validated.country) || null,
       });
     } else {
-      await db.insert(publisherProfiles).values({
-        userId: user.id,
+      await PublisherProfile.create({
+        userId: user._id,
         websiteUrl: publisherWebsite || null,
         socialMedia: publisherSocialLinks || null,
         niches: validated.niches || [],
@@ -146,15 +141,11 @@ export async function POST(request: NextRequest) {
       // Store the submitted website as a pending publisher site so admin can review it before approval.
       const domain = normalizeDomain(publisherWebsite);
       if (domain) {
-        const existingSite = await db.query.publisherSites.findFirst({
-          where: eq(publisherSites.domain, domain),
-        });
-
+        const existingSite = await PublisherSite.findOne({ domain }).lean();
         if (!existingSite) {
           const verificationToken = `lan-verify-${uuidv4().replace(/-/g, '').substring(0, 16)}`;
-
-          await db.insert(publisherSites).values({
-            userId: user.id,
+          await PublisherSite.create({
+            userId: user._id,
             domain,
             name: domain,
             verificationToken,
@@ -165,12 +156,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const token = await createToken({ userId: user.id, email: user.email, role: user.role });
+    const token = await createToken({ userId: String(user._id), email: user.email, role: user.role });
     await setAuthCookie(token);
 
     return NextResponse.json({
       success: true,
-      user: { id: user.id, email: user.email, role: user.role, status: user.status, firstName: user.firstName, lastName: user.lastName, referralCode },
+      user: { id: String(user._id), email: user.email, role: user.role, status: user.status, firstName: user.firstName, lastName: user.lastName, referralCode },
     });
   } catch (error) {
     if (error instanceof z.ZodError) {

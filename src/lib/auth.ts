@@ -1,10 +1,7 @@
 import { SignJWT, jwtVerify } from 'jose';
 import bcrypt from 'bcryptjs';
 import { cookies } from 'next/headers';
-import { db } from '@/db';
-import { users, wallets, advertiserProfiles, publisherProfiles } from '@/db/schema';
-import { eq } from 'drizzle-orm';
-import { createUniqueReferralCode } from '@/lib/referrals';
+import { connectToMongo, User, Wallet, AdvertiserProfile, PublisherProfile } from '@/db/mongo';
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'local-ad-network-secret-key-change-in-production');
 
@@ -54,16 +51,26 @@ export async function getCurrentUser() {
   const session = await getSession();
   if (!session) return null;
 
-  const user = await db.query.users.findFirst({
-    where: eq(users.id, session.userId),
-    with: {
-      wallet: true,
-      advertiserProfile: true,
-      publisherProfile: true,
-    },
-  });
+  await connectToMongo();
+  const user = await User.findById(session.userId).lean();
+  if (!user) return null;
 
-  return user;
+  const wallet = await Wallet.findOne({ userId: user._id }).lean();
+  const advertiserProfile = await AdvertiserProfile.findOne({ userId: user._id }).lean();
+  const publisherProfile = await PublisherProfile.findOne({ userId: user._id }).lean();
+
+  return {
+    id: String(user._id),
+    email: user.email,
+    role: user.role,
+    status: user.status,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    referralCode: user.referralCode,
+    wallet,
+    advertiserProfile,
+    publisherProfile,
+  } as any;
 }
 
 export async function createUser(
@@ -73,10 +80,28 @@ export async function createUser(
   firstName?: string,
   lastName?: string
 ) {
+  await connectToMongo();
+
+  const existing = await User.findOne({ email: email.toLowerCase() });
+  if (existing) return existing;
+
   const passwordHash = await hashPassword(password);
-  const referralCode = await createUniqueReferralCode();
-  
-  const [user] = await db.insert(users).values({
+
+  // Simple referral code generator - ensure uniqueness
+  async function generateUniqueReferralCode() {
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    for (let attempt = 0; attempt < 50; attempt++) {
+      let code = '';
+      for (let i = 0; i < 10; i++) code += alphabet[Math.floor(Math.random() * alphabet.length)];
+      const found = await User.findOne({ referralCode: code });
+      if (!found) return code;
+    }
+    return null;
+  }
+
+  const referralCode = (await generateUniqueReferralCode()) || undefined;
+
+  const user = await User.create({
     email: email.toLowerCase(),
     passwordHash,
     role,
@@ -84,23 +109,15 @@ export async function createUser(
     lastName,
     status: role === 'admin' ? 'active' : 'pending',
     referralCode,
-  }).returning();
-
-  // Create wallet for user
-  await db.insert(wallets).values({
-    userId: user.id,
-    balance: '0.00',
+    emailVerified: role === 'admin',
   });
 
-  // Create profile based on role
+  await Wallet.create({ userId: user._id, balance: 0 });
+
   if (role === 'advertiser') {
-    await db.insert(advertiserProfiles).values({
-      userId: user.id,
-    });
+    await AdvertiserProfile.create({ userId: user._id });
   } else if (role === 'publisher') {
-    await db.insert(publisherProfiles).values({
-      userId: user.id,
-    });
+    await PublisherProfile.create({ userId: user._id });
   }
 
   return user;

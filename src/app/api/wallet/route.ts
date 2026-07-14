@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/db';
-import { wallets, transactions } from '@/db/schema';
-import { eq, desc } from 'drizzle-orm';
 import { getSession } from '@/lib/auth';
+import { connectToMongo, Wallet, Transaction } from '@/db/mongo';
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,19 +9,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const wallet = await db.query.wallets.findFirst({
-      where: eq(wallets.userId, session.userId),
-    });
+    await connectToMongo();
+    const wallet = await Wallet.findOne({ userId: session.userId }).lean();
 
     if (!wallet) {
       return NextResponse.json({ error: 'Wallet not found' }, { status: 404 });
     }
 
-    const recentTransactions = await db.query.transactions.findMany({
-      where: eq(transactions.walletId, wallet.id),
-      orderBy: [desc(transactions.createdAt)],
-      limit: 20,
-    });
+    const recentTransactions = await Transaction.find({ walletId: wallet._id }).sort({ createdAt: -1 }).limit(20).lean();
 
     return NextResponse.json({
       wallet: {

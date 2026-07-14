@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/db';
-import { publisherProfiles, clicks, adUnitImpressions } from '@/db/schema';
-import { eq, count, sum, gte, and } from 'drizzle-orm';
+import { connectToMongo, Click } from '@/db/mongo';
 import { getSession, requireRole } from '@/lib/auth';
 
 // GET: Get publisher's unique tracking pixel code and stats
@@ -15,22 +13,29 @@ export async function GET(request: NextRequest) {
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || request.nextUrl.origin;
     const publisherId = session.userId;
 
-    // Get click stats
+    await connectToMongo();
+
+    // Get click stats (last 30 days)
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    
-    const [clickStats] = await db
-      .select({
-        totalClicks: count(),
-        totalEarnings: sum(clicks.publisherEarning),
-      })
-      .from(clicks)
-      .where(
-        and(
-          eq(clicks.publisherId, publisherId),
-          eq(clicks.status, 'valid'),
-          gte(clicks.createdAt, thirtyDaysAgo)
-        )
-      );
+
+    const clickAgg = await Click.aggregate([
+      {
+        $match: {
+          publisherId,
+          status: 'valid',
+          createdAt: { $gte: thirtyDaysAgo },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalClicks: { $sum: 1 },
+          totalEarnings: { $sum: '$publisherEarning' },
+        },
+      },
+    ]);
+
+    const clickStats = clickAgg[0] || { totalClicks: 0, totalEarnings: 0 };
 
     // Generate all pixel code variants
     const pixelCodes = {
@@ -74,8 +79,8 @@ export async function GET(request: NextRequest) {
       publisherId,
       pixelCodes,
       stats: {
-        totalClicks: clickStats?.totalClicks || 0,
-        totalEarnings: clickStats?.totalEarnings || '0.00',
+        totalClicks: clickStats.totalClicks || 0,
+        totalEarnings: clickStats.totalEarnings || '0.00',
         period: 'last_30_days',
       },
     });

@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/db';
-import { adWidgets, ads, campaigns, clicks, wallets, transactions } from '@/db/schema';
-import { eq, and, sql } from 'drizzle-orm';
+import { connectToMongo, AdWidget, Ad, Campaign } from '@/db/mongo';
 import { parseUserAgent } from '@/lib/utils';
 
 export async function GET(
@@ -13,9 +11,9 @@ export async function GET(
     const widgetId = widgetID;
     const format = request.nextUrl.searchParams.get('f') || 'js';
 
-    const widget = await db.query.adWidgets.findFirst({
-      where: and(eq(adWidgets.id, widgetId), eq(adWidgets.active, true)),
-    });
+    await connectToMongo();
+
+    const widget = await AdWidget.findOne({ _id: widgetId, active: true }).lean();
 
     if (!widget) {
       return new NextResponse('/* Widget not found */', {
@@ -24,40 +22,45 @@ export async function GET(
     }
 
     // Find matching active ads
-    let activeAds = await db
-      .select({ ad: ads, campaign: campaigns })
-      .from(ads)
-      .innerJoin(campaigns, eq(ads.campaignId, campaigns.id))
-      .where(and(
-        eq(campaigns.status, 'active'),
-        eq(ads.status, 'approved'),
-        sql`${campaigns.totalBudget}::numeric > ${campaigns.spentBudget}::numeric`
-      ))
-      .limit(20);
+    const activeCampaigns = await Campaign.find({
+      status: 'active',
+      $expr: { $gt: ['$totalBudget', '$spentBudget'] },
+    }).limit(50).lean();
+
+    const campaignIds = activeCampaigns.map((c: any) => c._id);
+
+    let activeAds = await Ad.find({
+      campaignId: { $in: campaignIds },
+      status: 'approved',
+    }).limit(20).lean();
+
+    // Combine ad + campaign pairs
+    let adCampaignPairs = activeAds.map((ad: any) => ({
+      ad,
+      campaign: activeCampaigns.find((c: any) => String(c._id) === String(ad.campaignId)),
+    }));
 
     // Filter by widget niches
     if (widget.targetNiches && widget.targetNiches.length > 0) {
-      activeAds = activeAds.filter(({ campaign }) => {
-        const cn = campaign.niches || [];
-        return widget.targetNiches!.some(n => cn.includes(n));
+      adCampaignPairs = adCampaignPairs.filter(({ campaign }: any) => {
+        const cn = campaign?.niches || [];
+        return widget.targetNiches.some((n: string) => cn.includes(n));
       });
     }
 
     // Pick random ads up to maxAds
-    const shuffled = activeAds.sort(() => Math.random() - 0.5);
+    const shuffled = adCampaignPairs.sort(() => Math.random() - 0.5);
     const selected = shuffled.slice(0, widget.maxAds || 1);
 
     // Update impressions
-    await db.update(adWidgets)
-      .set({ impressions: sql`${adWidgets.impressions} + 1` })
-      .where(eq(adWidgets.id, widgetId));
+    await AdWidget.updateOne({ _id: widgetId }, { $inc: { impressions: 1 } });
 
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || request.nextUrl.origin;
     const pubId = widget.publisherId;
 
     // Build ad HTML cards
-    const adCards = selected.map(({ ad, campaign }) => {
-      const clickUrl = `${baseUrl}/api/click?ad_id=${ad.id}&pub_id=${pubId}&widget_id=${widgetId}`;
+    const adCards = selected.map(({ ad, campaign }: any) => {
+      const clickUrl = `${baseUrl}/api/click?ad_id=${ad._id}&pub_id=${pubId}&widget_id=${widgetId}`;
       const image = ad.imageUrl ? `<img src="${ad.imageUrl}" alt="${ad.title}" style="width:100%;height:auto;max-height:200px;object-fit:cover;border-radius:${widget.borderRadius} ${widget.borderRadius} 0 0;">` : '';
       return `
 <div style="background:${widget.backgroundColor};border:1px solid #e5e7eb;border-radius:${widget.borderRadius};overflow:hidden;margin-bottom:8px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;">
@@ -97,14 +100,14 @@ export async function GET(
   d.innerHTML=${JSON.stringify(html)};
   c.parentNode.insertBefore(d,c.nextSibling);
   ${widget.rotateInterval && selected.length > 1 ? `
-  var ads=${JSON.stringify(selected.map(({ ad, campaign }) => ({
-    id: ad.id,
+  var ads=${JSON.stringify(selected.map(({ ad, campaign }: any) => ({
+    id: ad._id,
     title: ad.title,
     desc: (ad.description || '').substring(0, 120),
     img: ad.imageUrl,
     cta: ad.ctaText || 'Learn More',
     host: new URL(campaign.landingPageUrl).hostname,
-    click: baseUrl + '/api/click?ad_id=' + ad.id + '&pub_id=' + pubId + '&widget_id=' + widgetId,
+    click: baseUrl + '/api/click?ad_id=' + ad._id + '&pub_id=' + pubId + '&widget_id=' + widgetId,
   })))};
   ` : ''}
 })();

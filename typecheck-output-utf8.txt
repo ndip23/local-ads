@@ -1,0 +1,344 @@
+﻿
+> typecheck
+> tsc --noEmit
+
+src/app/api/admin/publisher-sites/[id]/route.ts(44,70): error TS2339: Property 'userId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'userId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/admin/publisher-sites/[id]/route.ts(47,56): error TS2339: Property 'userId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'userId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/admin/users/[id]/route.ts(27,56): error TS2339: Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/admin/users/[id]/route.ts(28,78): error TS2339: Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/admin/users/[id]/route.ts(29,76): error TS2339: Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/admin/users/[id]/route.ts(30,64): error TS2339: Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/admin/users/[id]/route.ts(32,24): error TS2339: Property 'role' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'role' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/admin/users/[id]/route.ts(32,87): error TS2339: Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/admin/users/[id]/route.ts(34,17): error TS2339: Property 'passwordHash' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'passwordHash' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/admin/users/[id]/route.ts(71,63): error TS2339: Property 'status' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'status' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/admin/withdrawals/[id]/route.ts(30,53): error TS2339: Property 'walletId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'walletId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/admin/withdrawals/[id]/route.ts(35,54): error TS2339: Property 'userId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'userId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/admin/withdrawals/[id]/route.ts(35,162): error TS2339: Property 'amount' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'amount' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/admin/withdrawals/[id]/route.ts(38,40): error TS2339: Property 'balance' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'balance' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/admin/withdrawals/[id]/route.ts(38,74): error TS2339: Property 'amount' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'amount' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/admin/withdrawals/[id]/route.ts(39,59): error TS2339: Property 'pendingBalance' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'pendingBalance' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/admin/withdrawals/[id]/route.ts(39,100): error TS2339: Property 'amount' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'amount' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/admin/withdrawals/[id]/route.ts(41,44): error TS2339: Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/admin/withdrawals/[id]/route.ts(48,54): error TS2339: Property 'userId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'userId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/admin/withdrawals/[id]/route.ts(48,162): error TS2339: Property 'amount' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'amount' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/admin/withdrawals/[id]/route.ts(50,59): error TS2339: Property 'pendingBalance' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'pendingBalance' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/admin/withdrawals/[id]/route.ts(50,100): error TS2339: Property 'amount' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'amount' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/admin/withdrawals/[id]/route.ts(51,48): error TS2339: Property 'totalWithdrawn' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'totalWithdrawn' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/admin/withdrawals/[id]/route.ts(51,89): error TS2339: Property 'amount' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'amount' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/admin/withdrawals/[id]/route.ts(53,44): error TS2339: Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/admin/withdrawals/[id]/route.ts(59,54): error TS2339: Property 'userId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'userId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/admin/withdrawals/[id]/route.ts(59,163): error TS2339: Property 'amount' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'amount' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/auth/login/route.ts(28,73): error TS2339: Property 'passwordHash' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'passwordHash' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/auth/login/route.ts(37,14): error TS2339: Property 'status' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'status' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/auth/login/route.ts(37,45): error TS2339: Property 'status' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'status' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/auth/login/route.ts(45,38): error TS2339: Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/auth/login/route.ts(49,27): error TS2339: Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/auth/login/route.ts(50,19): error TS2339: Property 'email' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'email' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/auth/login/route.ts(51,18): error TS2339: Property 'role' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'role' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/auth/login/route.ts(60,25): error TS2339: Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/auth/login/route.ts(61,21): error TS2339: Property 'email' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'email' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/auth/login/route.ts(62,20): error TS2339: Property 'role' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'role' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/auth/login/route.ts(63,22): error TS2339: Property 'status' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'status' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/auth/login/route.ts(64,25): error TS2339: Property 'firstName' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'firstName' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/auth/login/route.ts(65,24): error TS2339: Property 'lastName' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'lastName' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/auth/register/route.ts(101,45): error TS2339: Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/click/route.ts(30,49): error TS2339: Property 'campaignId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'campaignId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/click/route.ts(32,18): error TS2339: Property 'status' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'status' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/click/route.ts(32,84): error TS2339: Property 'landingPageUrl' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'landingPageUrl' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/click/route.ts(49,23): error TS2339: Property 'defaultCpc' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'defaultCpc' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/click/route.ts(49,48): error TS2339: Property 'defaultCpc' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'defaultCpc' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/click/route.ts(50,41): error TS2339: Property 'publisherShare' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'publisherShare' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/click/route.ts(50,70): error TS2339: Property 'publisherShare' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'publisherShare' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/click/route.ts(56,16): error TS2339: Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/click/route.ts(58,28): error TS2339: Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/click/route.ts(79,52): error TS2339: Property 'landingPageUrl' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'landingPageUrl' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/click/route.ts(83,34): error TS2339: Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/click/route.ts(86,46): error TS2339: Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/click/route.ts(89,62): error TS2339: Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/click/route.ts(92,50): error TS2339: Property 'spentBudget' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'spentBudget' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/click/route.ts(93,50): error TS2339: Property 'totalBudget' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'totalBudget' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/click/route.ts(94,49): error TS2339: Property 'todaySpent' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'todaySpent' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/click/route.ts(95,50): error TS2339: Property 'dailyBudget' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'dailyBudget' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/click/route.ts(98,50): error TS2339: Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/click/route.ts(101,54): error TS2339: Property 'advertiserId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'advertiserId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/click/route.ts(101,160): error TS2339: Property 'title' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'title' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/click/route.ts(101,226): error TS2339: Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/click/route.ts(106,70): error TS2339: Property 'advertiserId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'advertiserId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/click/route.ts(112,83): error TS2339: Property 'advertiserId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'advertiserId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/click/route.ts(112,252): error TS2339: Property 'title' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'title' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/click/route.ts(122,258): error TS2339: Property 'title' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'title' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/click/route.ts(128,49): error TS2339: Property 'landingPageUrl' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'landingPageUrl' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/convert/route.ts(28,74): error TS2339: Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/convert/route.ts(31,40): error TS2339: Property 'adId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'adId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/convert/route.ts(32,52): error TS2339: Property 'campaignId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'campaignId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/convert/route.ts(35,30): error TS2339: Property 'cpc' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'cpc' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/convert/route.ts(41,22): error TS2339: Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/convert/route.ts(42,19): error TS2339: Property 'adId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'adId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/convert/route.ts(43,26): error TS2339: Property 'publisherId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'publisherId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/convert/route.ts(44,25): error TS2339: Property 'campaignId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'campaignId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/convert/route.ts(53,42): error TS2339: Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/convert/route.ts(56,66): error TS2339: Property 'publisherId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'publisherId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/convert/route.ts(61,79): error TS2339: Property 'publisherId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'publisherId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/convert/route.ts(63,67): error TS2339: Property 'publisherId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'publisherId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/convert/route.ts(75,36): error TS2339: Property 'advertiserId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'advertiserId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/convert/route.ts(75,57): error TS2339: Property 'advertiserId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'advertiserId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/convert/route.ts(87,47): error TS2339: Property 'publisherId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'publisherId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/convert/route.ts(139,76): error TS2339: Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/convert/route.ts(141,34): error TS2339: Property 'cpc' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'cpc' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/convert/route.ts(145,69): error TS2339: Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/convert/route.ts(145,86): error TS2339: Property 'adId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'adId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/convert/route.ts(145,111): error TS2339: Property 'publisherId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'publisherId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/convert/route.ts(145,142): error TS2339: Property 'campaignId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'campaignId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/convert/route.ts(147,69): error TS2339: Property 'publisherId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'publisherId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/disputes/[id]/messages/route.ts(37,36): error TS2339: Property 'createdBy' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'createdBy' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/disputes/[id]/messages/route.ts(38,39): error TS2339: Property 'assignedTo' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'assignedTo' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/disputes/[id]/messages/route.ts(49,26): error TS2339: Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/disputes/[id]/messages/route.ts(62,42): error TS2339: Property 'disputeNumber' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'disputeNumber' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/disputes/[id]/route.ts(31,52): error TS2339: Property 'createdBy' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'createdBy' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/disputes/[id]/route.ts(31,108): error TS2339: Property 'assignedTo' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'assignedTo' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/disputes/[id]/route.ts(35,30): error TS2339: Property 'createdBy' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'createdBy' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/disputes/[id]/route.ts(35,49): error TS2339: Property 'assignedTo' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'assignedTo' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/disputes/[id]/route.ts(38,77): error TS2339: Property 'createdBy' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'createdBy' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/disputes/[id]/route.ts(39,78): error TS2339: Property 'assignedTo' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'assignedTo' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/disputes/[id]/route.ts(41,69): error TS2339: Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/disputes/[id]/route.ts(71,37): error TS2339: Property 'createdBy' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'createdBy' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/disputes/[id]/route.ts(105,36): error TS2339: Property 'status' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'status' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/disputes/[id]/route.ts(105,63): error TS2339: Property 'priority' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'priority' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/disputes/[id]/route.ts(105,94): error TS2339: Property 'resolution' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'resolution' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/disputes/[id]/route.ts(108,29): error TS2339: Property 'createdBy' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'createdBy' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/disputes/[id]/route.ts(110,25): error TS2339: Property 'createdBy' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'createdBy' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/disputes/[id]/route.ts(113,29): error TS2339: Property 'disputeNumber' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'disputeNumber' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/disputes/[id]/route.ts(113,61): error TS2339: Property 'status' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'status' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/disputes/[id]/route.ts(114,40): error TS2339: Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/disputes/[id]/route.ts(114,68): error TS2339: Property 'disputeNumber' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'disputeNumber' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/serve/[adUnitId]/route.ts(43,16): error TS2339: Property 'useNetworkAds' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'useNetworkAds' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/serve/[adUnitId]/route.ts(50,18): error TS2339: Property 'targetNiches' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'targetNiches' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/serve/[adUnitId]/route.ts(50,41): error TS2339: Property 'targetNiches' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'targetNiches' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/serve/[adUnitId]/route.ts(54,25): error TS2339: Property 'targetNiches' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'targetNiches' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/serve/[adUnitId]/route.ts(70,31): error TS2339: Property 'useAdsense' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'useAdsense' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/serve/[adUnitId]/route.ts(71,70): error TS2339: Property 'userId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'userId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/serve/[adUnitId]/route.ts(76,24): error TS2339: Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/serve/[adUnitId]/route.ts(89,44): error TS2339: Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/serve/[adUnitId]/route.ts(96,24): error TS2339: Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/serve/[adUnitId]/route.ts(97,27): error TS2339: Property 'userId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'userId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/serve/[adUnitId]/route.ts(111,22): error TS2339: Property 'id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/serve/[adUnitId]/route.ts(112,24): error TS2339: Property 'type' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'type' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/serve/[adUnitId]/route.ts(113,24): error TS2339: Property 'size' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'size' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/serve/[adUnitId]/route.ts(122,23): error TS18048: 'selectedAd.campaign' is possibly 'undefined'.
+src/app/api/serve/[adUnitId]/route.ts(127,26): error TS2339: Property 'adsenseSlotId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'adsenseSlotId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/serve/[adUnitId]/route.ts(134,54): error TS2339: Property 'size' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'size' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/serve/[adUnitId]/route.ts(134,67): error TS2339: Property 'customWidth' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'customWidth' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/serve/[adUnitId]/route.ts(134,87): error TS2339: Property 'customHeight' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'customHeight' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/serve/[adUnitId]/route.ts(140,88): error TS2339: Property 'userId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'userId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/serve/[adUnitId]/route.ts(140,113): error TS2339: Property 'id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/serve/[adUnitId]/route.ts(143,88): error TS2339: Property 'backgroundColor' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'backgroundColor' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/serve/[adUnitId]/route.ts(143,131): error TS2339: Property 'borderColor' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'borderColor' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/serve/[adUnitId]/route.ts(147,59): error TS2339: Property 'titleColor' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'titleColor' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/serve/[adUnitId]/route.ts(148,73): error TS2339: Property 'textColor' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'textColor' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/serve/[adUnitId]/route.ts(149,42): error TS2339: Property 'urlColor' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'urlColor' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/serve/[adUnitId]/route.ts(149,79): error TS18048: 'selectedAd.campaign' is possibly 'undefined'.
+src/app/api/serve/[adUnitId]/route.ts(162,25): error TS2339: Property 'adsenseSlotId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'adsenseSlotId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/serve/[adUnitId]/route.ts(162,65): error TS2339: Property 'adsenseSlotId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'adsenseSlotId' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/wallet/deposit/route.ts(28,38): error TS2339: Property 'balance' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'balance' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/wallet/deposit/route.ts(29,42): error TS2339: Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/wallet/deposit/route.ts(32,24): error TS2339: Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/wallet/deposit/route.ts(36,36): error TS2339: Property 'balance' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'balance' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/wallet/route.ts(19,74): error TS2339: Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/wallet/route.ts(23,25): error TS2339: Property 'balance' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'balance' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/wallet/route.ts(24,32): error TS2339: Property 'pendingBalance' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'pendingBalance' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/wallet/route.ts(25,31): error TS2339: Property 'totalEarnings' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'totalEarnings' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/wallet/route.ts(26,28): error TS2339: Property 'totalSpent' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'totalSpent' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/wallet/route.ts(27,32): error TS2339: Property 'totalWithdrawn' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'totalWithdrawn' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/wallet/route.ts(28,26): error TS2339: Property 'currency' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'currency' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/wallet/withdraw/route.ts(49,42): error TS2339: Property 'balance' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'balance' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/wallet/withdraw/route.ts(59,24): error TS2339: Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/wallet/withdraw/route.ts(69,45): error TS2339: Property 'pendingBalance' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'pendingBalance' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/wallet/withdraw/route.ts(71,42): error TS2339: Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/app/api/wallet/withdraw/route.ts(74,24): error TS2339: Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/lib/auth.ts(58,54): error TS2339: Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/lib/auth.ts(59,76): error TS2339: Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/lib/auth.ts(60,74): error TS2339: Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/lib/auth.ts(63,21): error TS2339: Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property '_id' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/lib/auth.ts(64,17): error TS2339: Property 'email' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'email' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/lib/auth.ts(65,16): error TS2339: Property 'role' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'role' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/lib/auth.ts(66,18): error TS2339: Property 'status' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'status' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/lib/auth.ts(67,21): error TS2339: Property 'firstName' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'firstName' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/lib/auth.ts(68,20): error TS2339: Property 'lastName' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'lastName' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/lib/auth.ts(69,24): error TS2339: Property 'referralCode' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'referralCode' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/lib/referrals.ts(47,12): error TS2339: Property 'referralCode' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'referralCode' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/lib/referrals.ts(47,60): error TS2339: Property 'referralCode' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'referralCode' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/lib/referrals.ts(56,18): error TS2339: Property 'referralCode' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'referralCode' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/lib/referrals.ts(56,69): error TS2339: Property 'referralCode' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'referralCode' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/lib/referrals.ts(73,18): error TS2339: Property 'referralCode' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'referralCode' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/lib/referrals.ts(73,69): error TS2339: Property 'referralCode' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'referralCode' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.
+src/lib/referrals.ts(135,36): error TS2339: Property 'referredBy' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[] | (FlattenMaps<any> & Required<{ _id: unknown; }>)'.
+  Property 'referredBy' does not exist on type '(FlattenMaps<any> & Required<{ _id: unknown; }>)[]'.

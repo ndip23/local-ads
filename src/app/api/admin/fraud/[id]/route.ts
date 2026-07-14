@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { db } from '@/db';
-import { fraudFlags } from '@/db/schema';
-import { eq } from 'drizzle-orm';
 import { getSession, requireRole } from '@/lib/auth';
+import { connectToMongo, FraudFlag } from '@/db/mongo';
 
 const resolveFraudSchema = z.object({
   resolved: z.boolean(),
@@ -24,19 +22,20 @@ export async function PATCH(
     const body = await request.json();
     const validated = resolveFraudSchema.parse(body);
 
-    const [updatedFlag] = await db.update(fraudFlags)
-      .set({
-        resolved: validated.resolved,
-        resolvedBy: validated.resolved ? session.userId : null,
-        resolvedAt: validated.resolved ? new Date() : null,
-      })
-      .where(eq(fraudFlags.id, id))
-      .returning();
+    await connectToMongo();
+    const update: any = { resolved: validated.resolved };
+    if (validated.resolved) {
+      update.resolvedBy = session.userId;
+      update.resolvedAt = new Date();
+    } else {
+      update.resolvedBy = null;
+      update.resolvedAt = null;
+    }
 
-    return NextResponse.json({
-      success: true,
-      flag: updatedFlag,
-    });
+    await FraudFlag.updateOne({ _id: id }, { $set: update });
+    const updatedFlag = await FraudFlag.findById(id).lean();
+
+    return NextResponse.json({ success: true, flag: updatedFlag });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(

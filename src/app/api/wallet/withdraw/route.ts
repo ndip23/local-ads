@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { db } from '@/db';
-import { wallets, withdrawals, transactions, notifications } from '@/db/schema';
-import { eq, sql, desc } from 'drizzle-orm';
 import { getSession, requireRole } from '@/lib/auth';
+import { connectToMongo, Wallet, Withdrawal, Transaction } from '@/db/mongo';
 
 const withdrawSchema = z.object({
   amount: z.number().positive().min(10),
@@ -18,10 +16,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const userWithdrawals = await db.query.withdrawals.findMany({
-      where: eq(withdrawals.userId, session.userId),
-      orderBy: [desc(withdrawals.createdAt)],
-    });
+    await connectToMongo();
+    const userWithdrawals = await Withdrawal.find({ userId: session.userId }).sort({ createdAt: -1 }).lean();
 
     return NextResponse.json({ withdrawals: userWithdrawals });
   } catch (error) {
@@ -43,68 +39,54 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validated = withdrawSchema.parse(body);
 
-    const wallet = await db.query.wallets.findFirst({
-      where: eq(wallets.userId, session.userId),
-    });
+    await connectToMongo();
+    const wallet = await Wallet.findOne({ userId: session.userId }).lean();
 
     if (!wallet) {
       return NextResponse.json({ error: 'Wallet not found' }, { status: 404 });
     }
 
-    const currentBalance = parseFloat(wallet.balance);
+    const currentBalance = Number(wallet.balance || 0);
     if (currentBalance < validated.amount) {
-      return NextResponse.json(
-        { error: 'Insufficient balance' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Insufficient balance' }, { status: 400 });
     }
 
-    // Calculate fee (2%)
     const fee = validated.amount * 0.02;
     const netAmount = validated.amount - fee;
 
-    // Create withdrawal request
-    const [withdrawal] = await db.insert(withdrawals).values({
+    const withdrawal = await Withdrawal.create({
       userId: session.userId,
-      walletId: wallet.id,
-      amount: validated.amount.toFixed(2),
-      fee: fee.toFixed(2),
-      netAmount: netAmount.toFixed(2),
+      walletId: wallet._id,
+      amount: validated.amount,
+      fee,
+      netAmount,
       status: 'pending',
       paymentMethod: validated.paymentMethod,
       paymentDetails: validated.paymentDetails,
-    }).returning();
+    });
 
-    // Hold funds in pending balance
     const newBalance = currentBalance - validated.amount;
-    const newPendingBalance = parseFloat(wallet.pendingBalance || '0') + validated.amount;
+    const newPendingBalance = Number(wallet.pendingBalance || 0) + validated.amount;
 
-    await db.update(wallets)
-      .set({
-        balance: newBalance.toFixed(2),
-        pendingBalance: newPendingBalance.toFixed(2),
-        updatedAt: new Date(),
-      })
-      .where(eq(wallets.id, wallet.id));
+    await Wallet.updateOne({ _id: wallet._id }, { $set: { balance: newBalance, pendingBalance: newPendingBalance, updatedAt: new Date() } });
 
-    // Create transaction record
-    await db.insert(transactions).values({
-      walletId: wallet.id,
+    await Transaction.create({
+      walletId: wallet._id,
       userId: session.userId,
       type: 'withdrawal',
-      amount: (-validated.amount).toFixed(2),
-      balanceBefore: wallet.balance,
-      balanceAfter: newBalance.toFixed(2),
+      amount: -validated.amount,
+      balanceBefore: currentBalance,
+      balanceAfter: newBalance,
       status: 'pending',
       description: `Withdrawal request via ${validated.paymentMethod}`,
-      referenceId: withdrawal.id,
+      referenceId: withdrawal._id,
       referenceType: 'withdrawal',
     });
 
     return NextResponse.json({
       success: true,
       withdrawal,
-      newBalance: newBalance.toFixed(2),
+      newBalance,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {

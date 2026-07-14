@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { db } from '@/db';
-import { adUnits } from '@/db/schema';
-import { eq, desc } from 'drizzle-orm';
+import { connectToMongo, AdUnit } from '@/db/mongo';
 import { getSession, requireRole } from '@/lib/auth';
-import { v4 as uuidv4 } from 'uuid';
 
 const createAdUnitSchema = z.object({
   name: z.string().min(1).max(100),
@@ -30,10 +27,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const userAdUnits = await db.query.adUnits.findMany({
-      where: eq(adUnits.userId, session.userId),
-      orderBy: [desc(adUnits.createdAt)],
-    });
+    await connectToMongo();
+
+    const userAdUnits = await AdUnit.find({ userId: session.userId })
+      .sort({ createdAt: -1 })
+      .lean();
 
     return NextResponse.json({ adUnits: userAdUnits });
   } catch (error) {
@@ -52,10 +50,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    await connectToMongo();
+
     const body = await request.json();
     const validated = createAdUnitSchema.parse(body);
 
-    const [adUnit] = await db.insert(adUnits).values({
+    const adUnit = await AdUnit.create({
       userId: session.userId,
       name: validated.name,
       type: validated.type,
@@ -71,11 +71,11 @@ export async function POST(request: NextRequest) {
       useAdsense: validated.useAdsense ?? true,
       adsenseSlotId: validated.adsenseSlotId,
       targetNiches: validated.targetNiches || [],
-    }).returning();
+    });
 
     return NextResponse.json({
       success: true,
-      adUnit,
+      adUnit: adUnit.toObject(),
     });
   } catch (error) {
     if (error instanceof z.ZodError) {

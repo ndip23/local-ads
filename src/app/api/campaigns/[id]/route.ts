@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { db } from '@/db';
-import { campaigns, ads, campaignLogs, approvalRequests, moduleActivityLogs } from '@/db/schema';
-import { eq, and } from 'drizzle-orm';
+import {
+  connectToMongo,
+  Campaign,
+  Ad,
+  AdTargeting,
+  Pixel,
+  User,
+  ApprovalRequest,
+  ModuleActivityLog,
+} from '@/db/mongo';
 import { getSession } from '@/lib/auth';
 import { ensureCampaignCoreSchema } from '@/lib/feature-schema';
 
@@ -51,7 +58,7 @@ const updateCampaignSchema = z.object({
   endDate: z.string().optional(),
   niches: z.array(z.string()).optional(),
   ad: z.object({
-    id: z.string().uuid().optional(),
+    id: z.string().optional(),
     title: z.string().trim().min(1).max(255).optional(),
     description: z.string().optional(),
     imageUrl: cloudinaryImageUrlSchema.optional(),
@@ -59,9 +66,6 @@ const updateCampaignSchema = z.object({
     ctaText: z.string().trim().max(100).optional(),
   }).optional(),
 });
-
-type CampaignStatus = typeof campaigns.status.enumValues[number];
-type AdStatus = typeof ads.status.enumValues[number];
 
 function hasCampaignContentChange(validated: z.infer<typeof updateCampaignSchema>) {
   return Boolean(
@@ -87,56 +91,45 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    await connectToMongo();
     await ensureCampaignCoreSchema();
 
     const { id } = await params;
 
-    let campaign;
-    try {
-      campaign = await db.query.campaigns.findFirst({
-        where: eq(campaigns.id, id),
-        with: {
-          ads: true,
-          targeting: true,
-          pixels: true,
-          advertiser: {
-            columns: {
-              id: true,
-              email: true,
-              firstName: true,
-              lastName: true,
-            },
-          },
-        },
-      });
-    } catch (pixelJoinError) {
-      console.error('Campaign detail pixel join failed:', pixelJoinError);
-      campaign = await db.query.campaigns.findFirst({
-        where: eq(campaigns.id, id),
-        with: {
-          ads: true,
-          targeting: true,
-          advertiser: {
-            columns: {
-              id: true,
-              email: true,
-              firstName: true,
-              lastName: true,
-            },
-          },
-        },
-      });
-    }
+    const campaign = await Campaign.findById(id).lean();
 
     if (!campaign) {
       return NextResponse.json({ error: 'Campaign not found' }, { status: 404 });
     }
 
-    if (session.role === 'advertiser' && campaign.advertiserId !== session.userId) {
+    if (session.role === 'advertiser' && String(campaign.advertiserId) !== session.userId) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    return NextResponse.json({ campaign });
+    // Populate related data
+    const campaignAds = await Ad.find({ campaignId: id }).lean();
+    const targeting = await AdTargeting.find({ campaignId: id }).lean();
+
+    let pixels: any[] = [];
+    try {
+      pixels = await Pixel.find({ campaignId: id }).lean();
+    } catch (pixelError) {
+      console.error('Campaign detail pixel lookup failed:', pixelError);
+    }
+
+    const advertiser = await User.findById(campaign.advertiserId)
+      .select('email firstName lastName')
+      .lean();
+
+    return NextResponse.json({
+      campaign: {
+        ...campaign,
+        ads: campaignAds,
+        targeting,
+        pixels,
+        advertiser,
+      },
+    });
   } catch (error) {
     console.error('Get campaign error:', error);
     return NextResponse.json(
@@ -156,22 +149,21 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    await connectToMongo();
     await ensureCampaignCoreSchema();
 
     const { id } = await params;
     const body = await request.json();
     const validated = updateCampaignSchema.parse(body);
 
-    const existingCampaign = await db.query.campaigns.findFirst({
-      where: eq(campaigns.id, id),
-      with: { ads: true },
-    });
-
+    const existingCampaign = await Campaign.findById(id).lean();
     if (!existingCampaign) {
       return NextResponse.json({ error: 'Campaign not found' }, { status: 404 });
     }
 
-    if (session.role === 'advertiser' && existingCampaign.advertiserId !== session.userId) {
+    const existingAds = await Ad.find({ campaignId: id }).lean();
+
+    if (session.role === 'advertiser' && String(existingCampaign.advertiserId) !== session.userId) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -207,21 +199,21 @@ export async function PATCH(
     const contentChanged = hasCampaignContentChange(validated);
     const advertiserEditedApprovedCampaign = session.role !== 'admin' && contentChanged && !['draft', 'pending_approval'].includes(existingCampaign.status);
 
-    const updateData: Partial<typeof campaigns.$inferInsert> = {
+    const updateData: Record<string, unknown> = {
       updatedAt: new Date(),
     };
 
     if (validated.title !== undefined) updateData.title = validated.title;
     if (validated.description !== undefined) updateData.description = validated.description;
     if (validated.landingPageUrl !== undefined) updateData.landingPageUrl = validated.landingPageUrl;
-    if (validated.totalBudget !== undefined) updateData.totalBudget = validated.totalBudget.toFixed(2);
-    if (validated.dailyBudget !== undefined) updateData.dailyBudget = validated.dailyBudget.toFixed(2);
+    if (validated.totalBudget !== undefined) updateData.totalBudget = validated.totalBudget;
+    if (validated.dailyBudget !== undefined) updateData.dailyBudget = validated.dailyBudget;
     if (validated.startDate !== undefined) updateData.startDate = validated.startDate ? new Date(validated.startDate) : null;
     if (validated.endDate !== undefined) updateData.endDate = validated.endDate ? new Date(validated.endDate) : null;
     if (validated.niches !== undefined) updateData.niches = validated.niches;
 
     if (validated.status) {
-      updateData.status = validated.status as CampaignStatus;
+      updateData.status = validated.status;
     }
     if (validated.rejectionReason !== undefined) {
       updateData.rejectionReason = validated.rejectionReason;
@@ -236,67 +228,61 @@ export async function PATCH(
       updateData.rejectionReason = null;
     }
 
-    const [updatedCampaign] = await db.update(campaigns)
-      .set(updateData)
-      .where(eq(campaigns.id, id))
-      .returning();
+    const updatedCampaign = await Campaign.findByIdAndUpdate(
+      id,
+      { $set: updateData },
+      { new: true }
+    ).lean();
 
     if (validated.ad) {
       const targetAd = validated.ad.id
-        ? existingCampaign.ads.find((ad) => ad.id === validated.ad?.id)
-        : existingCampaign.ads[0];
-
-      const adStatus: AdStatus | undefined = advertiserEditedApprovedCampaign ? 'pending' : undefined;
+        ? existingAds.find((ad: any) => String(ad._id) === validated.ad?.id)
+        : existingAds[0];
 
       if (targetAd) {
-        const adUpdate: Partial<typeof ads.$inferInsert> = { updatedAt: new Date() };
+        const adUpdate: Record<string, unknown> = { updatedAt: new Date() };
         if (validated.ad.title !== undefined) adUpdate.title = validated.ad.title;
         if (validated.ad.description !== undefined) adUpdate.description = validated.ad.description;
         if (validated.ad.imageUrl !== undefined) adUpdate.imageUrl = validated.ad.imageUrl;
         if (validated.ad.videoUrl !== undefined) adUpdate.videoUrl = validated.ad.videoUrl;
         if (validated.ad.ctaText !== undefined) adUpdate.ctaText = validated.ad.ctaText || 'Learn More';
-        if (adStatus) adUpdate.status = adStatus;
+        if (advertiserEditedApprovedCampaign) adUpdate.status = 'pending';
 
-        await db.update(ads)
-          .set(adUpdate)
-          .where(eq(ads.id, targetAd.id));
+        await Ad.findByIdAndUpdate(targetAd._id, { $set: adUpdate });
       } else if (validated.ad.title || validated.title || existingCampaign.title) {
-        await db.insert(ads).values({
+        await Ad.create({
           campaignId: id,
           title: validated.ad.title || validated.title || existingCampaign.title,
           description: validated.ad.description ?? validated.description ?? existingCampaign.description,
           imageUrl: validated.ad.imageUrl,
           videoUrl: validated.ad.videoUrl,
           ctaText: validated.ad.ctaText || 'Learn More',
-          status: advertiserEditedApprovedCampaign ? 'pending' : 'pending',
+          status: 'pending',
         });
       }
     }
 
     if (validated.status && ['active', 'rejected'].includes(validated.status)) {
-      await db.update(ads)
-        .set({
-          status: validated.status === 'active' ? 'approved' : 'rejected',
-          updatedAt: new Date(),
-        })
-        .where(eq(ads.campaignId, id));
+      await Ad.updateMany(
+        { campaignId: id },
+        { $set: { status: validated.status === 'active' ? 'approved' : 'rejected', updatedAt: new Date() } }
+      );
 
       try {
-        await db.update(approvalRequests)
-          .set({
-            status: validated.status === 'active' ? 'approved' : 'rejected',
-            decisionReason: validated.rejectionReason || (validated.status === 'active' ? 'Approved by admin review.' : 'Rejected by admin review.'),
-            decidedBy: session.userId,
-            decidedAt: new Date(),
-            updatedAt: new Date(),
-          })
-          .where(and(
-            eq(approvalRequests.entityType, 'campaign'),
-            eq(approvalRequests.entityId, id),
-            eq(approvalRequests.status, 'pending')
-          ));
+        await ApprovalRequest.updateMany(
+          { entityType: 'campaign', entityId: id, status: 'pending' },
+          {
+            $set: {
+              status: validated.status === 'active' ? 'approved' : 'rejected',
+              decisionReason: validated.rejectionReason || (validated.status === 'active' ? 'Approved by admin review.' : 'Rejected by admin review.'),
+              decidedBy: session.userId,
+              decidedAt: new Date(),
+              updatedAt: new Date(),
+            },
+          }
+        );
 
-        await db.insert(moduleActivityLogs).values({
+        await ModuleActivityLog.create({
           moduleKey: 'approvals',
           userId: session.userId,
           entityType: 'campaign',
@@ -310,18 +296,19 @@ export async function PATCH(
     }
 
     if (advertiserEditedApprovedCampaign) {
-      await db.update(ads)
-        .set({ status: 'pending', updatedAt: new Date() })
-        .where(eq(ads.campaignId, id));
+      await Ad.updateMany(
+        { campaignId: id },
+        { $set: { status: 'pending', updatedAt: new Date() } }
+      );
 
       try {
-        await db.insert(approvalRequests).values({
+        await ApprovalRequest.create({
           approvalNumber: `APR-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
           moduleKey: 'approvals',
           entityType: 'campaign',
           entityId: id,
           requestedBy: session.userId,
-          subject: `Campaign re-approval: ${updatedCampaign.title}`,
+          subject: `Campaign re-approval: ${updatedCampaign?.title}`,
           notes: 'Campaign was edited after approval and needs another admin review.',
           metadata: { campaignId: id },
         });
@@ -330,35 +317,25 @@ export async function PATCH(
       }
     }
 
+    // Refresh campaign with relations
+    const refreshedCampaign = await Campaign.findById(id).lean();
+    const refreshedAds = await Ad.find({ campaignId: id }).lean();
+    const refreshedTargeting = await AdTargeting.find({ campaignId: id }).lean();
+    let refreshedPixels: any[] = [];
     try {
-      await db.insert(campaignLogs).values({
-        campaignId: id,
-        userId: session.userId,
-        action: advertiserEditedApprovedCampaign ? 'edit_requires_reapproval' : 'update',
-        oldValue: existingCampaign as unknown as Record<string, unknown>,
-        newValue: validated as Record<string, unknown>,
-      });
-    } catch (logError) {
-      console.error('Campaign audit-log side-effect error:', logError);
-    }
-
-    let refreshedCampaign;
-    try {
-      refreshedCampaign = await db.query.campaigns.findFirst({
-        where: eq(campaigns.id, id),
-        with: { ads: true, targeting: true, pixels: true },
-      });
-    } catch (refreshError) {
-      console.error('Campaign refresh with pixels failed:', refreshError);
-      refreshedCampaign = await db.query.campaigns.findFirst({
-        where: eq(campaigns.id, id),
-        with: { ads: true, targeting: true },
-      });
+      refreshedPixels = await Pixel.find({ campaignId: id }).lean();
+    } catch (e) {
+      // ignore pixel errors
     }
 
     return NextResponse.json({
       success: true,
-      campaign: refreshedCampaign || updatedCampaign,
+      campaign: {
+        ...(refreshedCampaign || updatedCampaign),
+        ads: refreshedAds,
+        targeting: refreshedTargeting,
+        pixels: refreshedPixels,
+      },
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -385,17 +362,17 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    await connectToMongo();
+
     const { id } = await params;
 
-    const campaign = await db.query.campaigns.findFirst({
-      where: eq(campaigns.id, id),
-    });
+    const campaign = await Campaign.findById(id).lean();
 
     if (!campaign) {
       return NextResponse.json({ error: 'Campaign not found' }, { status: 404 });
     }
 
-    if (session.role !== 'admin' && campaign.advertiserId !== session.userId) {
+    if (session.role !== 'admin' && String(campaign.advertiserId) !== session.userId) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -406,7 +383,7 @@ export async function DELETE(
       );
     }
 
-    await db.delete(campaigns).where(eq(campaigns.id, id));
+    await Campaign.findByIdAndDelete(id);
 
     return NextResponse.json({ success: true });
   } catch (error) {

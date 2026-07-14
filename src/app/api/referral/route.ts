@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db, pool } from '@/db';
-import { users, referralEarnings, referralLevels } from '@/db/schema';
-import { eq, desc, sum, count, gte, and, inArray, asc } from 'drizzle-orm';
+import { connectToMongo, User, ReferralEarning, ReferralLevel, ReferralClick } from '@/db/mongo';
 import { getSession } from '@/lib/auth';
 import { buildReferralLink, ensureUserReferralCode, resetUserReferralCode, getReferralProgramSettings } from '@/lib/referrals';
 import { ensureReferralFeatureSchema } from '@/lib/feature-schema';
@@ -22,13 +20,10 @@ async function buildReferralTree(userId: string, maxLevels = 10) {
       continue;
     }
 
-    const nextLevel = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(inArray(users.referredBy, currentLevelIds));
+    const nextLevel = await User.find({ referredBy: { $in: currentLevelIds } }).select('_id').lean();
 
     referralTree[level] = nextLevel.length;
-    currentLevelIds = nextLevel.map((user) => user.id);
+    currentLevelIds = nextLevel.map((user: any) => String(user._id));
   }
 
   return referralTree;
@@ -39,87 +34,73 @@ export async function GET(request: NextRequest) {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+    await connectToMongo();
     await ensureReferralFeatureSchema();
 
     const referralCode = await ensureUserReferralCode(session.userId);
 
-    const user = await db.query.users.findFirst({
-      where: eq(users.id, session.userId),
-      columns: { referralCode: true, referredBy: true },
-    });
+    const user = await User.findById(session.userId).select('referralCode referredBy').lean();
 
     const settings = await getReferralProgramSettings();
     const maxLevels = Math.max(1, Math.min(10, Number(settings.maxLevels || 10)));
 
-    const levels = await db.query.referralLevels.findMany({
-      orderBy: [asc(referralLevels.level)],
-    });
+    const levels = await ReferralLevel.find().sort({ level: 1 }).lean();
 
-    const directReferrals = await db.query.users.findMany({
-      where: eq(users.referredBy, session.userId),
-      columns: { id: true, email: true, firstName: true, lastName: true, role: true, status: true, createdAt: true },
-      orderBy: [desc(users.createdAt)],
-    });
+    const directReferrals = await User.find({ referredBy: session.userId })
+      .select('email firstName lastName role status createdAt')
+      .sort({ createdAt: -1 })
+      .lean();
 
     const referralTree = await buildReferralTree(session.userId, maxLevels);
 
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const [earningsStats] = await db
-      .select({
-        totalEarnings: sum(referralEarnings.commissionAmount),
-        totalTransactions: count(),
-      })
-      .from(referralEarnings)
-      .where(eq(referralEarnings.earnerId, session.userId));
 
-    const [recentEarnings] = await db
-      .select({ total: sum(referralEarnings.commissionAmount) })
-      .from(referralEarnings)
-      .where(and(
-        eq(referralEarnings.earnerId, session.userId),
-        gte(referralEarnings.createdAt, thirtyDaysAgo)
-      ));
+    // Aggregate total earnings
+    const earningsAgg = await ReferralEarning.aggregate([
+      { $match: { earnerId: session.userId } },
+      { $group: { _id: null, totalEarnings: { $sum: '$commissionAmount' }, totalTransactions: { $sum: 1 } } },
+    ]);
+    const earningsStats = earningsAgg[0] || { totalEarnings: 0, totalTransactions: 0 };
 
-    const byLevel = await db
-      .select({
-        level: referralEarnings.level,
-        total: sum(referralEarnings.commissionAmount),
-        transactions: count(),
-      })
-      .from(referralEarnings)
-      .where(eq(referralEarnings.earnerId, session.userId))
-      .groupBy(referralEarnings.level)
-      .orderBy(referralEarnings.level);
+    // Aggregate recent earnings (last 30 days)
+    const recentAgg = await ReferralEarning.aggregate([
+      { $match: { earnerId: session.userId, createdAt: { $gte: thirtyDaysAgo } } },
+      { $group: { _id: null, total: { $sum: '$commissionAmount' } } },
+    ]);
+    const recentEarnings = recentAgg[0] || { total: 0 };
 
-    const bySourceType = await db
-      .select({
-        sourceType: referralEarnings.sourceType,
-        total: sum(referralEarnings.commissionAmount),
-        transactions: count(),
-      })
-      .from(referralEarnings)
-      .where(eq(referralEarnings.earnerId, session.userId))
-      .groupBy(referralEarnings.sourceType)
-      .orderBy(referralEarnings.sourceType);
+    // Aggregate by level
+    const byLevel = await ReferralEarning.aggregate([
+      { $match: { earnerId: session.userId } },
+      { $group: { _id: '$level', total: { $sum: '$commissionAmount' }, transactions: { $sum: 1 } } },
+      { $sort: { _id: 1 } },
+      { $project: { level: '$_id', total: 1, transactions: 1, _id: 0 } },
+    ]);
 
-    const recentLog = await db.query.referralEarnings.findMany({
-      where: eq(referralEarnings.earnerId, session.userId),
-      orderBy: [desc(referralEarnings.createdAt)],
-      limit: 20,
+    // Aggregate by source type
+    const bySourceType = await ReferralEarning.aggregate([
+      { $match: { earnerId: session.userId } },
+      { $group: { _id: '$sourceType', total: { $sum: '$commissionAmount' }, transactions: { $sum: 1 } } },
+      { $sort: { _id: 1 } },
+      { $project: { sourceType: '$_id', total: 1, transactions: 1, _id: 0 } },
+    ]);
+
+    // Recent log
+    const recentLog = await ReferralEarning.find({ earnerId: session.userId })
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .lean();
+
+    // Referral click stats (previously raw SQL)
+    const totalClicks = await ReferralClick.countDocuments({ referrerId: session.userId });
+    const last30DaysClicks = await ReferralClick.countDocuments({
+      referrerId: session.userId,
+      createdAt: { $gte: thirtyDaysAgo },
     });
 
-    const referralClickStats = await pool.query<{ total_clicks: string; last_30_days: string }>(
-      `SELECT
-        COUNT(*)::text AS total_clicks,
-        COUNT(*) FILTER (WHERE created_at >= now() - interval '30 days')::text AS last_30_days
-       FROM referral_clicks
-       WHERE referrer_id = $1`,
-      [session.userId]
-    );
-
     const referralClicks = {
-      total: Number(referralClickStats.rows[0]?.total_clicks || 0),
-      last30Days: Number(referralClickStats.rows[0]?.last_30_days || 0),
+      total: totalClicks,
+      last30Days: last30DaysClicks,
     };
 
     const totalTeam = Object.values(referralTree).reduce((total, value) => total + value, 0);
@@ -134,9 +115,9 @@ export async function GET(request: NextRequest) {
       levels,
       settings,
       earnings: {
-        total: earningsStats?.totalEarnings || '0.00',
-        last30Days: recentEarnings?.total || '0.00',
-        totalTransactions: earningsStats?.totalTransactions || 0,
+        total: earningsStats.totalEarnings || '0.00',
+        last30Days: recentEarnings.total || '0.00',
+        totalTransactions: earningsStats.totalTransactions || 0,
       },
       clicks: referralClicks,
       analysis: {

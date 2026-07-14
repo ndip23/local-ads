@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/db';
-import { adUnits, adsenseSettings } from '@/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { connectToMongo, AdUnit, AdsenseSettings } from '@/db/mongo';
 import { getSession, requireRole } from '@/lib/auth';
 
 export async function GET(
@@ -14,20 +12,18 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    await connectToMongo();
+
     const { id } = await params;
 
-    const adUnit = await db.query.adUnits.findFirst({
-      where: and(eq(adUnits.id, id), eq(adUnits.userId, session.userId)),
-    });
+    const adUnit = await AdUnit.findOne({ _id: id, userId: session.userId }).lean();
 
     if (!adUnit) {
       return NextResponse.json({ error: 'Ad unit not found' }, { status: 404 });
     }
 
     // Get AdSense settings
-    const adsense = await db.query.adsenseSettings.findFirst({
-      where: eq(adsenseSettings.userId, session.userId),
-    });
+    const adsense = await AdsenseSettings.findOne({ userId: session.userId }).lean();
 
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || request.nextUrl.origin;
 
@@ -35,16 +31,16 @@ export async function GET(
     const codes: Record<string, string> = {
       // Async JavaScript (recommended)
       asyncJs: `<!-- Local Ad Network - ${adUnit.name} -->
-<script async src="${baseUrl}/api/serve/${adUnit.id}?format=js"></script>`,
+<script async src="${baseUrl}/api/serve/${adUnit._id}?format=js"></script>`,
 
       // Synchronous JavaScript
       syncJs: `<!-- Local Ad Network - ${adUnit.name} -->
-<script src="${baseUrl}/api/serve/${adUnit.id}?format=js"></script>`,
+<script src="${baseUrl}/api/serve/${adUnit._id}?format=js"></script>`,
 
       // Iframe embed
       iframe: `<!-- Local Ad Network - ${adUnit.name} -->
 <iframe 
-  src="${baseUrl}/api/serve/${adUnit.id}?format=html" 
+  src="${baseUrl}/api/serve/${adUnit._id}?format=html" 
   style="border:none;width:100%;height:${getSizeHeight(adUnit.size)};"
   scrolling="no"
   frameborder="0">
@@ -52,19 +48,19 @@ export async function GET(
 
       // JSONP callback
       jsonp: `<!-- Local Ad Network - ${adUnit.name} -->
-<div id="lan-ad-${adUnit.id}"></div>
+<div id="lan-ad-${adUnit._id}"></div>
 <script>
-function lanAdCallback_${adUnit.id.replace(/-/g, '_')}(data) {
-  document.getElementById('lan-ad-${adUnit.id}').innerHTML = data.html;
+function lanAdCallback_${String(adUnit._id).replace(/-/g, '_')}(data) {
+  document.getElementById('lan-ad-${adUnit._id}').innerHTML = data.html;
 }
 </script>
-<script src="${baseUrl}/api/serve/${adUnit.id}?format=js&callback=lanAdCallback_${adUnit.id.replace(/-/g, '_')}"></script>`,
+<script src="${baseUrl}/api/serve/${adUnit._id}?format=js&callback=lanAdCallback_${String(adUnit._id).replace(/-/g, '_')}"></script>`,
 
       // Direct HTML fetch (for server-side rendering)
-      directUrl: `${baseUrl}/api/serve/${adUnit.id}?format=html`,
+      directUrl: `${baseUrl}/api/serve/${adUnit._id}?format=html`,
 
       // WordPress shortcode style
-      wordpress: `[local_ad_network unit="${adUnit.id}"]`,
+      wordpress: `[local_ad_network unit="${adUnit._id}"]`,
 
       // React component
       react: `import { useEffect, useRef } from 'react';
@@ -74,7 +70,7 @@ function LocalAdUnit() {
   
   useEffect(() => {
     const script = document.createElement('script');
-    script.src = '${baseUrl}/api/serve/${adUnit.id}?format=js';
+    script.src = '${baseUrl}/api/serve/${adUnit._id}?format=js';
     script.async = true;
     containerRef.current?.appendChild(script);
   }, []);
@@ -87,12 +83,12 @@ function LocalAdUnit() {
     if (adsense?.enabled && adsense.publisherId) {
       codes.withAdsenseFallback = `<!-- Local Ad Network with AdSense Fallback -->
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adsense.publisherId}" crossorigin="anonymous"></script>
-<script async src="${baseUrl}/api/serve/${adUnit.id}?format=js"></script>`;
+<script async src="${baseUrl}/api/serve/${adUnit._id}?format=js"></script>`;
     }
 
     return NextResponse.json({
       adUnit: {
-        id: adUnit.id,
+        id: adUnit._id,
         name: adUnit.name,
         type: adUnit.type,
         size: adUnit.size,

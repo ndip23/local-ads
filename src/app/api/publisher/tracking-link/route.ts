@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { db } from '@/db';
-import { ads, campaigns } from '@/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { connectToMongo, Ad, Campaign } from '@/db/mongo';
 import { getSession, requireRole } from '@/lib/auth';
 
 const trackingLinkSchema = z.object({
-  adId: z.string().uuid(),
+  adId: z.string(),
 });
 
 export async function POST(request: NextRequest) {
@@ -16,18 +14,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    await connectToMongo();
+
     const body = await request.json();
     const validated = trackingLinkSchema.parse(body);
 
     // Verify ad exists and campaign is active
-    const ad = await db.query.ads.findFirst({
-      where: and(eq(ads.id, validated.adId), eq(ads.status, 'approved')),
-      with: {
-        campaign: true,
-      },
-    });
+    const ad = await Ad.findOne({ _id: validated.adId, status: 'approved' }).lean();
 
-    if (!ad || !ad.campaign || ad.campaign.status !== 'active') {
+    if (!ad) {
+      return NextResponse.json(
+        { error: 'Ad not found or campaign not active' },
+        { status: 404 }
+      );
+    }
+
+    const campaign = await Campaign.findOne({ _id: ad.campaignId, status: 'active' }).lean();
+
+    if (!campaign) {
       return NextResponse.json(
         { error: 'Ad not found or campaign not active' },
         { status: 404 }
@@ -65,14 +69,14 @@ export async function POST(request: NextRequest) {
       embedCode,
       bannerCode,
       ad: {
-        id: ad.id,
+        id: ad._id,
         title: ad.title,
         videoUrl: ad.videoUrl,
         imageUrl: ad.imageUrl,
       },
       campaign: {
-        id: ad.campaign.id,
-        title: ad.campaign.title,
+        id: campaign._id,
+        title: campaign.title,
       },
     });
   } catch (error) {

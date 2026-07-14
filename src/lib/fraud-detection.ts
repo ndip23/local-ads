@@ -1,6 +1,4 @@
-import { db } from '@/db';
-import { clicks, fraudFlags } from '@/db/schema';
-import { eq, and, gte, count } from 'drizzle-orm';
+import { connectToMongo, Click, FraudFlag } from '@/db/mongo';
 
 export interface FraudCheckResult {
   isFraud: boolean;
@@ -67,36 +65,20 @@ export async function checkForFraud(
   }
 
   // 4. Check for repeated clicks from same IP in last 5 minutes
+  await connectToMongo();
   const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-  const recentClicksFromIp = await db
-    .select({ count: count() })
-    .from(clicks)
-    .where(
-      and(
-        eq(clicks.ipAddress, ipAddress),
-        eq(clicks.adId, adId),
-        gte(clicks.createdAt, fiveMinutesAgo)
-      )
-    );
+  const recentClicksFromIpCount = await Click.countDocuments({ ipAddress, adId, createdAt: { $gte: fiveMinutesAgo } });
 
-  if (recentClicksFromIp[0]?.count && recentClicksFromIp[0].count > 0) {
-    reasons.push(`Repeated clicks from same IP (${recentClicksFromIp[0].count} clicks)`);
-    severity = recentClicksFromIp[0].count > 3 ? 'high' : 'medium';
+  if (recentClicksFromIpCount && recentClicksFromIpCount > 0) {
+    reasons.push(`Repeated clicks from same IP (${recentClicksFromIpCount} clicks)`);
+    severity = recentClicksFromIpCount > 3 ? 'high' : 'medium';
   }
 
   // 5. Check for rapid clicks from same publisher in last minute
   const oneMinuteAgo = new Date(Date.now() - 60 * 1000);
-  const rapidPublisherClicks = await db
-    .select({ count: count() })
-    .from(clicks)
-    .where(
-      and(
-        eq(clicks.publisherId, publisherId),
-        gte(clicks.createdAt, oneMinuteAgo)
-      )
-    );
+  const rapidPublisherClicksCount = await Click.countDocuments({ publisherId, createdAt: { $gte: oneMinuteAgo } });
 
-  if (rapidPublisherClicks[0]?.count && rapidPublisherClicks[0].count > 10) {
+  if (rapidPublisherClicksCount && rapidPublisherClicksCount > 10) {
     reasons.push('Rapid click burst detected from publisher');
     severity = 'high';
   }
@@ -125,56 +107,21 @@ export async function logFraudFlag(
   severity: string,
   metadata?: Record<string, unknown>
 ) {
-  await db.insert(fraudFlags).values({
-    clickId,
-    userId,
-    ipAddress,
-    reason: reasons.join('; '),
-    severity,
-    metadata,
-  });
+  await connectToMongo();
+  await FraudFlag.create({ clickId, userId, ipAddress, reason: reasons.join('; '), severity, metadata });
 }
 
 export async function getIPClickCount(ipAddress: string, hours = 24): Promise<number> {
+  await connectToMongo();
   const hoursAgo = new Date(Date.now() - hours * 60 * 60 * 1000);
-  const result = await db
-    .select({ count: count() })
-    .from(clicks)
-    .where(
-      and(
-        eq(clicks.ipAddress, ipAddress),
-        gte(clicks.createdAt, hoursAgo)
-      )
-    );
-  return result[0]?.count || 0;
+  return await Click.countDocuments({ ipAddress, createdAt: { $gte: hoursAgo } });
 }
 
 export async function getPublisherFraudScore(publisherId: string): Promise<number> {
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-  
-  const totalClicks = await db
-    .select({ count: count() })
-    .from(clicks)
-    .where(
-      and(
-        eq(clicks.publisherId, publisherId),
-        gte(clicks.createdAt, thirtyDaysAgo)
-      )
-    );
-
-  const fraudClicks = await db
-    .select({ count: count() })
-    .from(clicks)
-    .where(
-      and(
-        eq(clicks.publisherId, publisherId),
-        eq(clicks.status, 'fraud'),
-        gte(clicks.createdAt, thirtyDaysAgo)
-      )
-    );
-
-  const total = totalClicks[0]?.count || 0;
-  const fraud = fraudClicks[0]?.count || 0;
+  await connectToMongo();
+  const total = await Click.countDocuments({ publisherId, createdAt: { $gte: thirtyDaysAgo } });
+  const fraud = await Click.countDocuments({ publisherId, status: 'fraud', createdAt: { $gte: thirtyDaysAgo } });
 
   if (total === 0) return 0;
   return Math.round((fraud / total) * 100);

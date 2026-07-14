@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { db } from '@/db';
-import { disputes, disputeMessages, moduleActivityLogs, notifications } from '@/db/schema';
-import { desc, eq, or } from 'drizzle-orm';
 import { getSession, requireRole } from '@/lib/auth';
+import { connectToMongo, Dispute, DisputeMessage, ModuleActivityLog, Notification, User } from '@/db/mongo';
 
 const createDisputeSchema = z.object({
   subject: z.string().trim().min(5).max(255),
@@ -32,28 +30,28 @@ export async function GET(request: NextRequest) {
     const status = request.nextUrl.searchParams.get('status');
     const priority = request.nextUrl.searchParams.get('priority');
 
-    const rows = await db.query.disputes.findMany({
-      where: session.role === 'admin'
-        ? undefined
-        : or(eq(disputes.createdBy, session.userId), eq(disputes.assignedTo, session.userId)),
-      with: {
-        creator: {
-          columns: { id: true, email: true, firstName: true, lastName: true, role: true },
-        },
-        assignee: {
-          columns: { id: true, email: true, firstName: true, lastName: true, role: true },
-        },
-      },
-      orderBy: [desc(disputes.createdAt)],
-    });
+    await connectToMongo();
 
-    const filtered = rows.filter((item) => {
-      if (status && item.status !== status) return false;
-      if (priority && item.priority !== priority) return false;
-      return true;
-    });
+    const filter: any = {};
+    if (session.role !== 'admin') {
+      filter.$or = [{ createdBy: session.userId }, { assignedTo: session.userId }];
+    }
+    if (status) filter.status = status;
+    if (priority) filter.priority = priority;
 
-    return NextResponse.json({ disputes: filtered });
+    const rows = await Dispute.find(filter).sort({ createdAt: -1 }).lean();
+
+    const userIds = rows.flatMap((r: any) => [r.createdBy, r.assignedTo]).filter(Boolean).map(String);
+    const uniqueUserIds = Array.from(new Set(userIds));
+    const users = uniqueUserIds.length ? await User.find({ _id: { $in: uniqueUserIds } }).select('email firstName lastName role').lean() : [];
+
+    const disputesWithUsers = rows.map((r: any) => ({
+      ...r,
+      creator: users.find((u: any) => String(u._id) === String(r.createdBy)) || null,
+      assignee: users.find((u: any) => String(u._id) === String(r.assignedTo)) || null,
+    }));
+
+    return NextResponse.json({ disputes: disputesWithUsers });
   } catch (error) {
     console.error('Get disputes error:', error);
     return NextResponse.json({ error: 'Failed to fetch disputes' }, { status: 500 });
@@ -70,7 +68,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validated = createDisputeSchema.parse(body);
 
-    const [created] = await db.insert(disputes).values({
+    await connectToMongo();
+
+    const created = await Dispute.create({
       disputeNumber: generateDisputeNumber(),
       createdBy: session.userId,
       relatedType: validated.relatedType || 'general',
@@ -78,43 +78,37 @@ export async function POST(request: NextRequest) {
       subject: validated.subject,
       category: validated.category,
       description: validated.description,
-      amount: typeof validated.amount === 'number' ? validated.amount.toFixed(2) : null,
+      amount: typeof validated.amount === 'number' ? validated.amount : undefined,
       priority: validated.priority || 'medium',
       metadata: validated.metadata || {},
-    }).returning();
+    });
 
-
-    await db.insert(disputeMessages).values({
-      disputeId: created.id,
+    await DisputeMessage.create({
+      disputeId: created._id,
       senderId: session.userId,
       message: validated.description,
       attachments: [],
       internalNote: false,
     });
 
-    await db.insert(moduleActivityLogs).values({
+    await ModuleActivityLog.create({
       moduleKey: 'disputes',
       userId: session.userId,
       entityType: 'dispute',
-      entityId: created.id,
+      entityId: created._id,
       action: 'dispute_opened',
       metadata: { disputeNumber: created.disputeNumber, category: created.category, priority: created.priority },
     });
 
-    // Notify admins indirectly through the notifications table when an admin-created case is not involved.
     if (session.role !== 'admin') {
-      const adminUsers = await db.query.users.findMany({
-        where: (users, { eq }) => eq(users.role, 'admin'),
-        columns: { id: true },
-      });
-
+      const adminUsers = await User.find({ role: 'admin' }).select('_id').lean();
       if (adminUsers.length) {
-        await db.insert(notifications).values(adminUsers.map((admin) => ({
-          userId: admin.id,
-          type: 'system' as const,
+        await Notification.insertMany(adminUsers.map((admin: any) => ({
+          userId: admin._id,
+          type: 'system',
           title: 'New dispute opened',
           message: `${validated.subject} has been submitted for review.`,
-          metadata: { disputeId: created.id, disputeNumber: created.disputeNumber },
+          metadata: { disputeId: created._id, disputeNumber: created.disputeNumber },
         })));
       }
     }

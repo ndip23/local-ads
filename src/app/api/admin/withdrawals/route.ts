@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod';
-import { db } from '@/db';
-import { withdrawals, wallets, transactions, notifications, users } from '@/db/schema';
-import { eq, desc, sql } from 'drizzle-orm';
 import { getSession, requireRole } from '@/lib/auth';
+import { connectToMongo, Withdrawal, User } from '@/db/mongo';
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,30 +12,16 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const status = searchParams.get('status');
 
-    const whereClause = status 
-      ? eq(withdrawals.status, status as 'pending' | 'approved' | 'rejected' | 'completed')
-      : undefined;
+    await connectToMongo();
+    const filter: any = {};
+    if (status) filter.status = status;
 
-    const allWithdrawals = await db.query.withdrawals.findMany({
-      where: whereClause,
-      orderBy: [desc(withdrawals.createdAt)],
-    });
+    const allWithdrawals = await Withdrawal.find(filter).sort({ createdAt: -1 }).lean();
 
-    // Get user info for each withdrawal
-    const withdrawalsWithUsers = await Promise.all(
-      allWithdrawals.map(async (w) => {
-        const user = await db.query.users.findFirst({
-          where: eq(users.id, w.userId),
-          columns: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-          },
-        });
-        return { ...w, user };
-      })
-    );
+    const userIds = allWithdrawals.map((w: any) => w.userId).filter(Boolean);
+    const users = await User.find({ _id: { $in: userIds } }).select('id email firstName lastName').lean();
+
+    const withdrawalsWithUsers = allWithdrawals.map((w: any) => ({ ...w, user: users.find((u: any) => String(u._id) === String(w.userId)) || null }));
 
     return NextResponse.json({ withdrawals: withdrawalsWithUsers });
   } catch (error) {

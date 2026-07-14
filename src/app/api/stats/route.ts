@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/db';
-import { users, campaigns, clicks, conversions, transactions, wallets, withdrawals, fraudFlags } from '@/db/schema';
-import { eq, count, sum, gte, and, sql, desc } from 'drizzle-orm';
-import { getSession, requireRole } from '@/lib/auth';
+import { connectToMongo, User, Campaign, Click, Conversion, Wallet, Withdrawal } from '@/db/mongo';
+import { getSession } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,6 +8,8 @@ export async function GET(request: NextRequest) {
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    await connectToMongo();
 
     const searchParams = request.nextUrl.searchParams;
     const period = searchParams.get('period') || '30d';
@@ -32,67 +32,89 @@ export async function GET(request: NextRequest) {
 
     if (session.role === 'admin') {
       // Admin stats - platform-wide
-      const [userStats] = await db
-        .select({
-          total: count(),
-          advertisers: sql<number>`COUNT(CASE WHEN role = 'advertiser' THEN 1 END)`,
-          publishers: sql<number>`COUNT(CASE WHEN role = 'publisher' THEN 1 END)`,
-          pending: sql<number>`COUNT(CASE WHEN status = 'pending' THEN 1 END)`,
-        })
-        .from(users);
+      const userAgg = await User.aggregate([
+        {
+          $group: {
+            _id: null,
+            total: { $sum: 1 },
+            advertisers: { $sum: { $cond: [{ $eq: ['$role', 'advertiser'] }, 1, 0] } },
+            publishers: { $sum: { $cond: [{ $eq: ['$role', 'publisher'] }, 1, 0] } },
+            pending: { $sum: { $cond: [{ $eq: ['$status', 'pending'] }, 1, 0] } },
+          },
+        },
+      ]);
+      const userStats = userAgg[0] || { total: 0, advertisers: 0, publishers: 0, pending: 0 };
 
-      const [campaignStats] = await db
-        .select({
-          total: count(),
-          active: sql<number>`COUNT(CASE WHEN status = 'active' THEN 1 END)`,
-          pending: sql<number>`COUNT(CASE WHEN status = 'pending_approval' THEN 1 END)`,
-        })
-        .from(campaigns);
+      const campaignAgg = await Campaign.aggregate([
+        {
+          $group: {
+            _id: null,
+            total: { $sum: 1 },
+            active: { $sum: { $cond: [{ $eq: ['$status', 'active'] }, 1, 0] } },
+            pending: { $sum: { $cond: [{ $eq: ['$status', 'pending_approval'] }, 1, 0] } },
+          },
+        },
+      ]);
+      const campaignStats = campaignAgg[0] || { total: 0, active: 0, pending: 0 };
 
-      const [clickStats] = await db
-        .select({
-          total: count(),
-          valid: sql<number>`COUNT(CASE WHEN status = 'valid' THEN 1 END)`,
-          fraud: sql<number>`COUNT(CASE WHEN status = 'fraud' THEN 1 END)`,
-          totalRevenue: sum(clicks.platformEarning),
-        })
-        .from(clicks)
-        .where(gte(clicks.createdAt, startDate));
+      const clickAgg = await Click.aggregate([
+        { $match: { createdAt: { $gte: startDate } } },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: 1 },
+            valid: { $sum: { $cond: [{ $eq: ['$status', 'valid'] }, 1, 0] } },
+            fraud: { $sum: { $cond: [{ $eq: ['$status', 'fraud'] }, 1, 0] } },
+            totalRevenue: { $sum: '$platformEarning' },
+          },
+        },
+      ]);
+      const clickStats = clickAgg[0] || { total: 0, valid: 0, fraud: 0, totalRevenue: 0 };
 
-      const [conversionStats] = await db
-        .select({
-          total: count(),
-          totalValue: sum(conversions.value),
-        })
-        .from(conversions)
-        .where(gte(conversions.createdAt, startDate));
+      const conversionAgg = await Conversion.aggregate([
+        { $match: { createdAt: { $gte: startDate } } },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: 1 },
+            totalValue: { $sum: '$value' },
+          },
+        },
+      ]);
+      const conversionStats = conversionAgg[0] || { total: 0, totalValue: 0 };
 
-      const [withdrawalStats] = await db
-        .select({
-          pending: sql<number>`COUNT(CASE WHEN status = 'pending' THEN 1 END)`,
-          pendingAmount: sql<string>`COALESCE(SUM(CASE WHEN status = 'pending' THEN amount::numeric ELSE 0 END), 0)`,
-        })
-        .from(withdrawals);
+      const withdrawalAgg = await Withdrawal.aggregate([
+        {
+          $group: {
+            _id: null,
+            pending: { $sum: { $cond: [{ $eq: ['$status', 'pending'] }, 1, 0] } },
+            pendingAmount: { $sum: { $cond: [{ $eq: ['$status', 'pending'] }, '$amount', 0] } },
+          },
+        },
+      ]);
+      const withdrawalStats = withdrawalAgg[0] || { pending: 0, pendingAmount: 0 };
 
       // Daily clicks for chart
-      const dailyClicks = await db
-        .select({
-          date: sql<string>`DATE(created_at)`,
-          clicks: count(),
-          revenue: sum(clicks.platformEarning),
-        })
-        .from(clicks)
-        .where(gte(clicks.createdAt, startDate))
-        .groupBy(sql`DATE(created_at)`)
-        .orderBy(sql`DATE(created_at)`);
+      const dailyClicks = await Click.aggregate([
+        { $match: { createdAt: { $gte: startDate } } },
+        {
+          $group: {
+            _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+            clicks: { $sum: 1 },
+            revenue: { $sum: '$platformEarning' },
+          },
+        },
+        { $sort: { _id: 1 } },
+        { $project: { date: '$_id', clicks: 1, revenue: 1, _id: 0 } },
+      ]);
 
       return NextResponse.json({
         users: userStats,
         campaigns: campaignStats,
         clicks: {
           ...clickStats,
-          fraudRate: clickStats.total > 0 
-            ? ((Number(clickStats.fraud) / Number(clickStats.total)) * 100).toFixed(2) 
+          fraudRate: clickStats.total > 0
+            ? ((Number(clickStats.fraud) / Number(clickStats.total)) * 100).toFixed(2)
             : '0',
         },
         conversions: conversionStats,
@@ -101,56 +123,42 @@ export async function GET(request: NextRequest) {
       });
     } else if (session.role === 'advertiser') {
       // Advertiser stats
-      const [campaignStats] = await db
-        .select({
-          total: count(),
-          active: sql<number>`COUNT(CASE WHEN status = 'active' THEN 1 END)`,
-          totalBudget: sum(campaigns.totalBudget),
-          totalSpent: sum(campaigns.spentBudget),
-        })
-        .from(campaigns)
-        .where(eq(campaigns.advertiserId, session.userId));
+      const campaignAgg = await Campaign.aggregate([
+        { $match: { advertiserId: session.userId } },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: 1 },
+            active: { $sum: { $cond: [{ $eq: ['$status', 'active'] }, 1, 0] } },
+            totalBudget: { $sum: '$totalBudget' },
+            totalSpent: { $sum: '$spentBudget' },
+          },
+        },
+      ]);
+      const campaignStats = campaignAgg[0] || { total: 0, active: 0, totalBudget: 0, totalSpent: 0 };
 
-      const userCampaigns = await db.query.campaigns.findMany({
-        where: eq(campaigns.advertiserId, session.userId),
-        columns: { id: true },
-      });
-
-      const campaignIds = userCampaigns.map(c => c.id);
+      const userCampaigns = await Campaign.find({ advertiserId: session.userId }).select('_id').lean();
+      const campaignIds = userCampaigns.map((c: any) => c._id);
 
       let clickStats = { total: 0, totalCost: '0' };
       let conversionStats = { total: 0 };
 
       if (campaignIds.length > 0) {
-        const [cs] = await db
-          .select({
-            total: count(),
-            totalCost: sum(clicks.cpc),
-          })
-          .from(clicks)
-          .where(
-            and(
-              sql`${clicks.campaignId} IN (${sql.raw(campaignIds.map(id => `'${id}'`).join(','))})`,
-              gte(clicks.createdAt, startDate)
-            )
-          );
-        clickStats = { total: cs.total || 0, totalCost: cs.totalCost || '0' };
+        const csAgg = await Click.aggregate([
+          { $match: { campaignId: { $in: campaignIds }, createdAt: { $gte: startDate } } },
+          { $group: { _id: null, total: { $sum: 1 }, totalCost: { $sum: '$cpc' } } },
+        ]);
+        const cs = csAgg[0] || { total: 0, totalCost: 0 };
+        clickStats = { total: cs.total || 0, totalCost: String(cs.totalCost || '0') };
 
-        const [cvs] = await db
-          .select({ total: count() })
-          .from(conversions)
-          .where(
-            and(
-              sql`${conversions.campaignId} IN (${sql.raw(campaignIds.map(id => `'${id}'`).join(','))})`,
-              gte(conversions.createdAt, startDate)
-            )
-          );
-        conversionStats = { total: cvs.total || 0 };
+        const cvsAgg = await Conversion.aggregate([
+          { $match: { campaignId: { $in: campaignIds }, createdAt: { $gte: startDate } } },
+          { $group: { _id: null, total: { $sum: 1 } } },
+        ]);
+        conversionStats = { total: cvsAgg[0]?.total || 0 };
       }
 
-      const wallet = await db.query.wallets.findFirst({
-        where: eq(wallets.userId, session.userId),
-      });
+      const wallet = await Wallet.findOne({ userId: session.userId }).lean();
 
       return NextResponse.json({
         campaigns: campaignStats,
@@ -163,73 +171,61 @@ export async function GET(request: NextRequest) {
       });
     } else {
       // Publisher stats
-      const [clickStats] = await db
-        .select({
-          total: count(),
-          valid: sql<number>`COUNT(CASE WHEN status = 'valid' THEN 1 END)`,
-          earnings: sum(clicks.publisherEarning),
-        })
-        .from(clicks)
-        .where(
-          and(
-            eq(clicks.publisherId, session.userId),
-            gte(clicks.createdAt, startDate)
-          )
-        );
+      const clickAgg = await Click.aggregate([
+        { $match: { publisherId: session.userId, createdAt: { $gte: startDate } } },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: 1 },
+            valid: { $sum: { $cond: [{ $eq: ['$status', 'valid'] }, 1, 0] } },
+            earnings: { $sum: '$publisherEarning' },
+          },
+        },
+      ]);
+      const clickStats = clickAgg[0] || { total: 0, valid: 0, earnings: 0 };
 
-      const [conversionStats] = await db
-        .select({
-          total: count(),
-          earnings: sum(conversions.publisherEarning),
-        })
-        .from(conversions)
-        .where(
-          and(
-            eq(conversions.publisherId, session.userId),
-            gte(conversions.createdAt, startDate)
-          )
-        );
+      const conversionAgg = await Conversion.aggregate([
+        { $match: { publisherId: session.userId, createdAt: { $gte: startDate } } },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: 1 },
+            earnings: { $sum: '$publisherEarning' },
+          },
+        },
+      ]);
+      const conversionStats = conversionAgg[0] || { total: 0, earnings: 0 };
 
-      const wallet = await db.query.wallets.findFirst({
-        where: eq(wallets.userId, session.userId),
-      });
+      const wallet = await Wallet.findOne({ userId: session.userId }).lean();
 
       // Top performing campaigns
-      const topCampaigns = await db
-        .select({
-          campaignId: clicks.campaignId,
-          clicks: count(),
-          earnings: sum(clicks.publisherEarning),
-        })
-        .from(clicks)
-        .where(
-          and(
-            eq(clicks.publisherId, session.userId),
-            eq(clicks.status, 'valid'),
-            gte(clicks.createdAt, startDate)
-          )
-        )
-        .groupBy(clicks.campaignId)
-        .orderBy(desc(sum(clicks.publisherEarning)))
-        .limit(5);
+      const topCampaigns = await Click.aggregate([
+        { $match: { publisherId: session.userId, status: 'valid', createdAt: { $gte: startDate } } },
+        {
+          $group: {
+            _id: '$campaignId',
+            clicks: { $sum: 1 },
+            earnings: { $sum: '$publisherEarning' },
+          },
+        },
+        { $sort: { earnings: -1 } },
+        { $limit: 5 },
+        { $project: { campaignId: '$_id', clicks: 1, earnings: 1, _id: 0 } },
+      ]);
 
       // Daily earnings for chart
-      const dailyEarnings = await db
-        .select({
-          date: sql<string>`DATE(created_at)`,
-          clicks: count(),
-          earnings: sum(clicks.publisherEarning),
-        })
-        .from(clicks)
-        .where(
-          and(
-            eq(clicks.publisherId, session.userId),
-            eq(clicks.status, 'valid'),
-            gte(clicks.createdAt, startDate)
-          )
-        )
-        .groupBy(sql`DATE(created_at)`)
-        .orderBy(sql`DATE(created_at)`);
+      const dailyEarnings = await Click.aggregate([
+        { $match: { publisherId: session.userId, status: 'valid', createdAt: { $gte: startDate } } },
+        {
+          $group: {
+            _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+            clicks: { $sum: 1 },
+            earnings: { $sum: '$publisherEarning' },
+          },
+        },
+        { $sort: { _id: 1 } },
+        { $project: { date: '$_id', clicks: 1, earnings: 1, _id: 0 } },
+      ]);
 
       return NextResponse.json({
         clicks: clickStats,

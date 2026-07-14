@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/db';
-import { publisherSites } from '@/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { connectToMongo, PublisherSite } from '@/db/mongo';
 import { getSession, requireRole } from '@/lib/auth';
 
 export async function POST(
@@ -14,14 +12,11 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    await connectToMongo();
+
     const { id } = await params;
 
-    const site = await db.query.publisherSites.findFirst({
-      where: and(
-        eq(publisherSites.id, id),
-        eq(publisherSites.userId, session.userId)
-      ),
-    });
+    const site = await PublisherSite.findOne({ _id: id, userId: session.userId }).lean();
 
     if (!site) {
       return NextResponse.json({ error: 'Site not found' }, { status: 404 });
@@ -47,12 +42,10 @@ export async function POST(
 
       if (metaTagPattern.test(html) || metaTagAltPattern.test(html)) {
         // Verification successful
-        await db.update(publisherSites)
-          .set({
-            verified: true,
-            updatedAt: new Date(),
-          })
-          .where(eq(publisherSites.id, id));
+        await PublisherSite.updateOne(
+          { _id: id },
+          { $set: { verified: true, updatedAt: new Date() } }
+        );
 
         return NextResponse.json({
           success: true,

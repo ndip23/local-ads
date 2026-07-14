@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/db';
-import { users, publisherSites } from '@/db/schema';
-import { eq, desc, and, or, ilike, count, inArray } from 'drizzle-orm';
 import { getSession, requireRole } from '@/lib/auth';
+import { connectToMongo, User, Wallet, AdvertiserProfile, PublisherProfile, PublisherSite } from '@/db/mongo';
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,72 +17,43 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '20');
     const offset = (page - 1) * limit;
 
-    const conditions = [];
-    
-    if (role) {
-      conditions.push(eq(users.role, role as 'admin' | 'advertiser' | 'publisher'));
-    }
-    if (status) {
-      conditions.push(eq(users.status, status as 'pending' | 'active' | 'suspended' | 'banned'));
-    }
+    await connectToMongo();
+
+    const filter: any = {};
+    if (role) filter.role = role;
+    if (status) filter.status = status;
     if (search) {
-      conditions.push(
-        or(
-          ilike(users.email, `%${search}%`),
-          ilike(users.firstName, `%${search}%`),
-          ilike(users.lastName, `%${search}%`)
-        )
-      );
+      const regex = new RegExp(search, 'i');
+      filter.$or = [{ email: regex }, { firstName: regex }, { lastName: regex }];
     }
 
-    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    const total = await User.countDocuments(filter);
+    const usersList = await User.find(filter).sort({ createdAt: -1 }).skip(offset).limit(limit).lean();
 
-    const usersList = await db.query.users.findMany({
-      where: whereClause,
-      with: {
-        wallet: true,
-        advertiserProfile: true,
-        publisherProfile: true,
-      },
-      columns: {
-        passwordHash: false,
-      },
-      orderBy: [desc(users.createdAt)],
-      limit,
-      offset,
-    });
+    const userIds = usersList.map((u: any) => u._id);
+    const wallets = await Wallet.find({ userId: { $in: userIds } }).lean();
+    const advertiserProfiles = await AdvertiserProfile.find({ userId: { $in: userIds } }).lean();
+    const publisherProfiles = await PublisherProfile.find({ userId: { $in: userIds } }).lean();
 
-    const publisherIds = usersList
-      .filter((user) => user.role === 'publisher')
-      .map((user) => user.id);
-
-    const sitesByPublisherId: Record<string, typeof publisherSites.$inferSelect[]> = {};
-
-    if (publisherIds.length > 0) {
-      const sites = await db.query.publisherSites.findMany({
-        where: inArray(publisherSites.userId, publisherIds),
-        orderBy: [desc(publisherSites.createdAt)],
-      });
-
-      for (const site of sites) {
-        sitesByPublisherId[site.userId] = sitesByPublisherId[site.userId] || [];
-        sitesByPublisherId[site.userId].push(site);
-      }
+    const publisherIds = usersList.filter((u: any) => u.role === 'publisher').map((u: any) => u._id.toString());
+    const sites = publisherIds.length > 0 ? await PublisherSite.find({ userId: { $in: publisherIds } }).sort({ createdAt: -1 }).lean() : [];
+    const sitesByPublisherId: Record<string, any[]> = {};
+    for (const s of sites) {
+      const key = String(s.userId);
+      sitesByPublisherId[key] = sitesByPublisherId[key] || [];
+      sitesByPublisherId[key].push(s);
     }
 
-    const totalResult = await db.select({ count: count() })
-      .from(users)
-      .where(whereClause);
-
-    return NextResponse.json({
-      users: usersList.map((user) => ({
-        ...user,
-        publisherSites: sitesByPublisherId[user.id] || [],
-      })),
-      page,
-      limit,
-      total: totalResult[0]?.count || 0,
+    const usersWithExtras = usersList.map((user: any) => {
+      const idStr = String(user._id);
+      const wallet = wallets.find((w: any) => String(w.userId) === idStr) || null;
+      const advertiserProfile = advertiserProfiles.find((p: any) => String(p.userId) === idStr) || null;
+      const publisherProfile = publisherProfiles.find((p: any) => String(p.userId) === idStr) || null;
+      delete user.passwordHash;
+      return { ...user, wallet, advertiserProfile, publisherProfile, publisherSites: sitesByPublisherId[idStr] || [] };
     });
+
+    return NextResponse.json({ users: usersWithExtras, page, limit, total });
   } catch (error) {
     console.error('Get users error:', error);
     return NextResponse.json(

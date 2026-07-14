@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { db } from '@/db';
-import { adWidgets } from '@/db/schema';
-import { eq, desc } from 'drizzle-orm';
+import { connectToMongo, AdWidget } from '@/db/mongo';
 import { getSession, requireRole } from '@/lib/auth';
 
 const createWidgetSchema = z.object({
@@ -26,10 +24,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const widgets = await db.query.adWidgets.findMany({
-      where: eq(adWidgets.publisherId, session.userId),
-      orderBy: [desc(adWidgets.createdAt)],
-    });
+    await connectToMongo();
+
+    const widgets = await AdWidget.find({ publisherId: session.userId })
+      .sort({ createdAt: -1 })
+      .lean();
 
     return NextResponse.json({ widgets });
   } catch (error) {
@@ -45,10 +44,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    await connectToMongo();
+
     const body = await request.json();
     const validated = createWidgetSchema.parse(body);
 
-    const [widget] = await db.insert(adWidgets).values({
+    const widget = await AdWidget.create({
       publisherId: session.userId,
       name: validated.name,
       style: validated.style,
@@ -61,9 +62,9 @@ export async function POST(request: NextRequest) {
       backgroundColor: validated.backgroundColor || '#ffffff',
       borderRadius: validated.borderRadius || '8px',
       showBranding: validated.showBranding ?? true,
-    }).returning();
+    });
 
-    return NextResponse.json({ success: true, widget });
+    return NextResponse.json({ success: true, widget: widget.toObject() });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: 'Validation failed', details: error.issues }, { status: 400 });

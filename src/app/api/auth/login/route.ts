@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { db } from '@/db';
-import { users } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { connectToMongo, User } from '@/db/mongo';
 import { verifyPassword, createToken, setAuthCookie } from '@/lib/auth';
 
 const loginSchema = z.object({
@@ -15,10 +13,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validated = loginSchema.parse(body);
 
-    // Find user
-    const user = await db.query.users.findFirst({
-      where: eq(users.email, validated.email.toLowerCase()),
-    });
+    // Find user in Mongo
+    await connectToMongo();
+    const user = await User.findOne({ email: validated.email.toLowerCase() }).lean();
 
     if (!user) {
       return NextResponse.json(
@@ -45,13 +42,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Update last login
-    await db.update(users)
-      .set({ lastLoginAt: new Date() })
-      .where(eq(users.id, user.id));
+    await User.updateOne({ _id: user._id }, { $set: { lastLoginAt: new Date() } });
 
     // Create token
     const token = await createToken({
-      userId: user.id,
+      userId: String(user._id),
       email: user.email,
       role: user.role,
     });
@@ -62,7 +57,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       user: {
-        id: user.id,
+        id: String(user._id),
         email: user.email,
         role: user.role,
         status: user.status,

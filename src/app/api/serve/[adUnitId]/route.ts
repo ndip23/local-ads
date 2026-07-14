@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/db';
-import { adUnits, ads, campaigns, adUnitImpressions, adServingLog, adsenseSettings, countryRates } from '@/db/schema';
-import { eq, and, sql } from 'drizzle-orm';
 import { parseUserAgent } from '@/lib/utils';
+import { connectToMongo, AdUnit, Ad, Campaign, AdUnitImpression, AdServingLog, AdsenseSettings, CountryRate, AdTargeting } from '@/db/mongo';
+
+import mongoose from '@/db/mongo';
 
 // Simple IP to country mapping (in production, use a proper geo-IP service)
 function getCountryFromIP(ip: string): { code: string; name: string } {
@@ -20,9 +20,8 @@ export async function GET(
     const callback = searchParams.get('callback'); // For JSONP
 
     // Get ad unit
-    const adUnit = await db.query.adUnits.findFirst({
-      where: and(eq(adUnits.id, adUnitId), eq(adUnits.active, true)),
-    });
+    await connectToMongo();
+    const adUnit = await AdUnit.findOne({ _id: adUnitId, active: true }).lean();
 
     if (!adUnit) {
       return serveEmptyResponse(format, callback, 'Ad unit not found');
@@ -42,54 +41,40 @@ export async function GET(
     let adSource = 'none';
 
     if (adUnit.useNetworkAds) {
-      // Find active campaigns with matching niches
-      const activeAds = await db
-        .select({
-          ad: ads,
-          campaign: campaigns,
-        })
-        .from(ads)
-        .innerJoin(campaigns, eq(ads.campaignId, campaigns.id))
-        .where(
-          and(
-            eq(campaigns.status, 'active'),
-            eq(ads.status, 'approved'),
-            sql`${campaigns.totalBudget}::numeric > ${campaigns.spentBudget}::numeric`
-          )
-        )
-        .limit(10);
+      // Find active campaigns where totalBudget > spentBudget
+      const campaigns = await Campaign.find({ status: 'active', $expr: { $gt: ['$totalBudget', '$spentBudget'] } }).limit(50).lean();
+      const campaignIds = campaigns.map((c: any) => c._id);
+      let activeAds = await Ad.find({ campaignId: { $in: campaignIds }, status: 'approved' }).limit(50).lean();
 
       // Filter by niches if specified
-      let matchingAds = activeAds;
       if (adUnit.targetNiches && adUnit.targetNiches.length > 0) {
-        matchingAds = activeAds.filter(({ campaign }) => {
-          const campaignNiches = campaign.niches || [];
-          return adUnit.targetNiches!.some(niche => 
-            campaignNiches.includes(niche)
-          );
+        activeAds = activeAds.filter((a: any) => {
+          const campaign = campaigns.find((c: any) => String(c._id) === String(a.campaignId));
+          const campaignNiches = campaign?.niches || [];
+          return adUnit.targetNiches.some((n: string) => campaignNiches.includes(n));
         });
       }
 
-      // Select a random ad from matching ones
-      if (matchingAds.length > 0) {
-        const randomIndex = Math.floor(Math.random() * matchingAds.length);
-        selectedAd = matchingAds[randomIndex];
+      if (activeAds.length > 0) {
+        const randomIndex = Math.floor(Math.random() * activeAds.length);
+        const picked = activeAds[randomIndex];
+        // attach campaign reference
+        const campaign = campaigns.find((c: any) => String(c._id) === String(picked.campaignId));
+        selectedAd = { ad: picked, campaign };
         adSource = 'network';
       }
     }
 
     // Get AdSense settings for fallback
-    let adsenseConfig = null;
+    let adsenseConfig: any = null;
     if (!selectedAd && adUnit.useAdsense) {
-      adsenseConfig = await db.query.adsenseSettings.findFirst({
-        where: eq(adsenseSettings.userId, adUnit.userId),
-      });
+      adsenseConfig = await AdsenseSettings.findOne({ userId: adUnit.userId }).lean();
     }
 
     // Log impression
-    await db.insert(adUnitImpressions).values({
-      adUnitId: adUnit.id,
-      adId: selectedAd?.ad.id || null,
+    await AdUnitImpression.create({
+      adUnitId: adUnit._id,
+      adId: selectedAd?.ad._id || null,
       ipAddress: ip,
       country: countryName,
       countryCode,
@@ -100,15 +85,17 @@ export async function GET(
     });
 
     // Update ad unit impressions count
-    await db.update(adUnits)
-      .set({ impressions: sql`${adUnits.impressions} + 1` })
-      .where(eq(adUnits.id, adUnit.id));
+    try {
+      await AdUnit.updateOne({ _id: adUnit._id }, { $inc: { impressions: 1 } });
+    } catch (incErr) {
+      console.warn('Failed to increment ad unit impressions', incErr);
+    }
 
     // Log ad serving
-    await db.insert(adServingLog).values({
-      adUnitId: adUnit.id,
+    await AdServingLog.create({
+      adUnitId: adUnit._id,
       publisherId: adUnit.userId,
-      adId: selectedAd?.ad.id || null,
+      adId: selectedAd?.ad._id || null,
       adSource: selectedAd ? 'network' : (adsenseConfig?.enabled ? 'adsense' : 'fallback'),
       reason: selectedAd ? 'Network ad available' : (adsenseConfig?.enabled ? 'AdSense fallback' : 'No ads available'),
       ipAddress: ip,
@@ -121,18 +108,18 @@ export async function GET(
       return NextResponse.json({
         success: true,
         adUnit: {
-          id: adUnit.id,
+          id: String(adUnit._id),
           type: adUnit.type,
           size: adUnit.size,
         },
         ad: selectedAd ? {
-          id: selectedAd.ad.id,
+          id: String(selectedAd.ad._id),
           title: selectedAd.ad.title,
           description: selectedAd.ad.description,
           imageUrl: selectedAd.ad.imageUrl,
           videoUrl: selectedAd.ad.videoUrl,
           ctaText: selectedAd.ad.ctaText,
-          landingUrl: selectedAd.campaign.landingPageUrl,
+          landingUrl: selectedAd.campaign?.landingPageUrl || '',
         } : null,
         fallback: !selectedAd && adsenseConfig?.enabled ? {
           type: 'adsense',
@@ -150,7 +137,7 @@ export async function GET(
 
     if (selectedAd) {
       // Network ad
-      const clickUrl = `${baseUrl}/api/click?ad_id=${selectedAd.ad.id}&pub_id=${adUnit.userId}&unit_id=${adUnit.id}`;
+      const clickUrl = `${baseUrl}/api/click?ad_id=${String(selectedAd.ad._id)}&pub_id=${String(adUnit.userId)}&unit_id=${String(adUnit._id)}`;
       
       adHtml = `
         <div class="lan-ad" style="width:${width};height:${height};background:${adUnit.backgroundColor};border:1px solid ${adUnit.borderColor || '#ddd'};overflow:hidden;position:relative;font-family:Arial,sans-serif;">
@@ -159,7 +146,7 @@ export async function GET(
             <div style="padding:8px;">
               <div style="font-weight:bold;color:${adUnit.titleColor};font-size:14px;margin-bottom:4px;">${selectedAd.ad.title}</div>
               ${selectedAd.ad.description ? `<div style="color:${adUnit.textColor};font-size:12px;margin-bottom:4px;">${selectedAd.ad.description.substring(0, 80)}...</div>` : ''}
-              <div style="color:${adUnit.urlColor};font-size:11px;">${new URL(selectedAd.campaign.landingPageUrl).hostname}</div>
+              <div style="color:${adUnit.urlColor};font-size:11px;">${new URL(selectedAd.campaign?.landingPageUrl || '').hostname}</div>
             </div>
           </a>
           <div style="position:absolute;bottom:2px;right:4px;font-size:9px;color:#999;">Ad</div>

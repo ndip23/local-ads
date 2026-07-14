@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { db } from '@/db';
-import { referralLevels } from '@/db/schema';
-import { eq, asc } from 'drizzle-orm';
+import { connectToMongo, ReferralLevel } from '@/db/mongo';
 import { getSession, requireRole } from '@/lib/auth';
 import { ensureReferralFeatureSchema } from '@/lib/feature-schema';
 
@@ -13,11 +11,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    await connectToMongo();
     await ensureReferralFeatureSchema();
 
-    const levels = await db.query.referralLevels.findMany({
-      orderBy: [asc(referralLevels.level)],
-    });
+    const levels = await ReferralLevel.find().sort({ level: 1 }).lean();
 
     return NextResponse.json({ levels });
   } catch (error) {
@@ -40,35 +37,37 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    await connectToMongo();
     await ensureReferralFeatureSchema();
 
     const body = await request.json();
     const validated = levelSchema.parse(body);
 
     // Upsert
-    const existing = await db.query.referralLevels.findFirst({
-      where: eq(referralLevels.level, validated.level),
-    });
+    const existing = await ReferralLevel.findOne({ level: validated.level }).lean();
 
     if (existing) {
-      const [updated] = await db.update(referralLevels)
-        .set({
-          commissionPercent: validated.commissionPercent.toFixed(2),
-          label: validated.label || `Level ${validated.level}`,
-          active: validated.active ?? true,
-          updatedAt: new Date(),
-        })
-        .where(eq(referralLevels.level, validated.level))
-        .returning();
+      const updated = await ReferralLevel.findOneAndUpdate(
+        { level: validated.level },
+        {
+          $set: {
+            commissionPercent: validated.commissionPercent,
+            label: validated.label || `Level ${validated.level}`,
+            active: validated.active ?? true,
+            updatedAt: new Date(),
+          },
+        },
+        { new: true }
+      ).lean();
       return NextResponse.json({ success: true, level: updated });
     } else {
-      const [created] = await db.insert(referralLevels).values({
+      const created = await ReferralLevel.create({
         level: validated.level,
-        commissionPercent: validated.commissionPercent.toFixed(2),
+        commissionPercent: validated.commissionPercent,
         label: validated.label || `Level ${validated.level}`,
         active: validated.active ?? true,
-      }).returning();
-      return NextResponse.json({ success: true, level: created });
+      });
+      return NextResponse.json({ success: true, level: created.toObject() });
     }
   } catch (error) {
     if (error instanceof z.ZodError) {

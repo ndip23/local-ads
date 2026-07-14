@@ -1,18 +1,18 @@
 import { randomInt } from 'crypto';
-import { eq, sql, asc } from 'drizzle-orm';
-import { db } from '@/db';
-import { users, wallets, transactions, referralEarnings, referralLevels, referralProgramSettings } from '@/db/schema';
+import {
+  User,
+  Wallet,
+  ReferralProgramSettings,
+  ReferralLevel,
+  ReferralEarning,
+  Transaction,
+  connectToMongo,
+} from '@/db/mongo';
 import { ensureReferralFeatureSchema } from '@/lib/feature-schema';
 
 const REFERRAL_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const MAX_REFERRAL_LEVELS = 10;
 const DEFAULT_REFERRAL_CODE_LENGTH = 10;
-
-type PostgresError = Error & { code?: string };
-
-function isUniqueViolation(error: unknown): boolean {
-  return Boolean(error && typeof error === 'object' && (error as PostgresError).code === '23505');
-}
 
 export function normalizeReferralCode(code: string): string {
   return code.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 20);
@@ -27,15 +27,11 @@ export function generateReferralCode(length = DEFAULT_REFERRAL_CODE_LENGTH): str
 }
 
 export async function createUniqueReferralCode(): Promise<string> {
-  await ensureReferralFeatureSchema();
+  await connectToMongo();
 
   for (let attempts = 0; attempts < 50; attempts++) {
     const code = generateReferralCode();
-    const existing = await db.query.users.findFirst({
-      where: eq(users.referralCode, code),
-      columns: { id: true },
-    });
-
+    const existing = await User.findOne({ referralCode: code }).select('_id').lean();
     if (!existing) return code;
   }
 
@@ -43,50 +39,38 @@ export async function createUniqueReferralCode(): Promise<string> {
 }
 
 export async function ensureUserReferralCode(userId: string): Promise<string> {
+  await connectToMongo();
   await ensureReferralFeatureSchema();
 
-  const user = await db.query.users.findFirst({
-    where: eq(users.id, userId),
-    columns: { id: true, referralCode: true },
-  });
-
+  const user = await User.findById(userId).select('referralCode').lean();
   if (!user) throw new Error('User not found');
   if (user.referralCode) return normalizeReferralCode(user.referralCode);
 
   for (let attempts = 0; attempts < 10; attempts++) {
     const referralCode = await createUniqueReferralCode();
-
-    try {
-      const [updatedUser] = await db.update(users)
-        .set({ referralCode, updatedAt: new Date() })
-        .where(eq(users.id, userId))
-        .returning({ referralCode: users.referralCode });
-
-      if (updatedUser?.referralCode) return normalizeReferralCode(updatedUser.referralCode);
-    } catch (error) {
-      if (!isUniqueViolation(error)) throw error;
-    }
+    const updated = await User.findOneAndUpdate(
+      { _id: userId, referralCode: { $in: [null, undefined, ''] } },
+      { $set: { referralCode, updatedAt: new Date() } },
+      { new: true }
+    ).lean();
+    if (updated?.referralCode) return normalizeReferralCode(updated.referralCode);
   }
 
   throw new Error('Failed to assign referral code');
 }
 
 export async function resetUserReferralCode(userId: string): Promise<string> {
+  await connectToMongo();
   await ensureReferralFeatureSchema();
 
   for (let attempts = 0; attempts < 10; attempts++) {
     const referralCode = await createUniqueReferralCode();
-
-    try {
-      const [updatedUser] = await db.update(users)
-        .set({ referralCode, updatedAt: new Date() })
-        .where(eq(users.id, userId))
-        .returning({ referralCode: users.referralCode });
-
-      if (updatedUser?.referralCode) return normalizeReferralCode(updatedUser.referralCode);
-    } catch (error) {
-      if (!isUniqueViolation(error)) throw error;
-    }
+    const updated = await User.findOneAndUpdate(
+      { _id: userId },
+      { $set: { referralCode, updatedAt: new Date() } },
+      { new: true }
+    ).lean();
+    if (updated?.referralCode) return normalizeReferralCode(updated.referralCode);
   }
 
   throw new Error('Failed to reset referral code');
@@ -99,18 +83,19 @@ export function buildReferralLink(baseUrl: string, referralCode: string): string
 }
 
 export async function getReferralProgramSettings() {
+  await connectToMongo();
   await ensureReferralFeatureSchema();
 
-  const settings = await db.query.referralProgramSettings.findFirst();
+  let settings = await ReferralProgramSettings.findOne().lean();
   if (settings) return settings;
 
-  const [created] = await db.insert(referralProgramSettings).values({
+  const created = await ReferralProgramSettings.create({
     enabled: true,
-    minCommissionableAmount: '0.0000',
+    minCommissionableAmount: 0,
     maxLevels: 10,
     cookieDays: 30,
     commissionSource: 'publisher_earnings',
-  }).returning();
+  });
 
   return created;
 }
@@ -134,26 +119,17 @@ export async function awardReferralCommissions(input: {
     const settings = await getReferralProgramSettings();
     if (!settings.enabled) return;
 
-    const threshold = Number(settings.minCommissionableAmount || '0');
+    const threshold = Number(settings.minCommissionableAmount || 0);
     if (threshold > 0 && input.sourceEarning < threshold) return;
 
     const maxLevels = Math.max(1, Math.min(MAX_REFERRAL_LEVELS, Number(settings.maxLevels || MAX_REFERRAL_LEVELS)));
 
-    const configuredLevels = await db.query.referralLevels.findMany({
-      where: eq(referralLevels.active, true),
-      orderBy: [asc(referralLevels.level)],
-    });
-
+    const configuredLevels = await ReferralLevel.find({ active: true }).sort({ level: 1 }).lean();
     if (configuredLevels.length === 0) return;
 
-    const levelMap = new Map<number, number>(
-      configuredLevels.map((level) => [level.level, Number(level.commissionPercent || '0')])
-    );
+    const levelMap = new Map<number, number>(configuredLevels.map((l: any) => [l.level, Number(l.commissionPercent || 0)]));
 
-    let sourceUser = await db.query.users.findFirst({
-      where: eq(users.id, input.sourceUserId),
-      columns: { id: true, referredBy: true },
-    });
+    let sourceUser = await User.findById(input.sourceUserId).select('referredBy').lean();
 
     for (let level = 1; level <= maxLevels; level++) {
       const earnerId = sourceUser?.referredBy;
@@ -163,62 +139,47 @@ export async function awardReferralCommissions(input: {
       const commissionAmount = (input.sourceEarning * commissionPercent) / 100;
 
       if (commissionPercent > 0 && commissionAmount > 0) {
-        const [earning] = await db.insert(referralEarnings).values({
+        const earning = await ReferralEarning.create({
           earnerId,
           sourceUserId: input.sourceUserId,
           level,
           sourceType: input.sourceType,
-          sourceEarning: input.sourceEarning.toFixed(4),
-          commissionPercent: commissionPercent.toFixed(2),
-          commissionAmount: commissionAmount.toFixed(4),
+          sourceEarning: input.sourceEarning,
+          commissionPercent,
+          commissionAmount,
           referenceId: input.referenceId,
-        }).returning();
-
-        const earnerWallet = await db.query.wallets.findFirst({
-          where: eq(wallets.userId, earnerId),
         });
 
+        const earnerWallet = await Wallet.findOne({ userId: earnerId });
         if (earnerWallet) {
           const walletCredit = Number(commissionAmount.toFixed(2));
-
           if (walletCredit > 0) {
-            const currentBalance = Number(earnerWallet.balance || '0');
-            const newBalance = currentBalance + walletCredit;
+            const newBalance = (earnerWallet.balance || 0) + walletCredit;
+            await Wallet.updateOne({ _id: earnerWallet._id }, { $set: { balance: newBalance, totalEarnings: (earnerWallet.totalEarnings || 0) + walletCredit, updatedAt: new Date() } });
 
-            await db.update(wallets)
-              .set({
-                balance: newBalance.toFixed(2),
-                totalEarnings: sql`${wallets.totalEarnings} + ${walletCredit}`,
-                updatedAt: new Date(),
-              })
-              .where(eq(wallets.id, earnerWallet.id));
-
-            await db.insert(transactions).values({
-              walletId: earnerWallet.id,
+            await Transaction.create({
+              walletId: earnerWallet._id,
               userId: earnerId,
               type: 'adjustment',
-              amount: walletCredit.toFixed(2),
+              amount: walletCredit,
               balanceBefore: earnerWallet.balance,
-              balanceAfter: newBalance.toFixed(2),
+              balanceAfter: newBalance,
               status: 'completed',
               description: `Level ${level} referral commission from ${input.sourceType}`,
-              referenceId: earning.id,
+              referenceId: earning._id,
               referenceType: 'referral_earning',
               metadata: {
                 sourceUserId: input.sourceUserId,
                 sourceType: input.sourceType,
                 originalReferenceId: input.referenceId,
-                rawCommissionAmount: commissionAmount.toFixed(4),
+                rawCommissionAmount: commissionAmount,
               },
             });
           }
         }
       }
 
-      sourceUser = await db.query.users.findFirst({
-        where: eq(users.id, earnerId),
-        columns: { id: true, referredBy: true },
-      });
+      sourceUser = await User.findById(String(earnerId)).select('referredBy').lean();
     }
   } catch (commissionError) {
     console.error('Referral commission award error:', commissionError);

@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { db } from '@/db';
-import { adsenseSettings } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { connectToMongo, AdsenseSettings } from '@/db/mongo';
 import { getSession, requireRole } from '@/lib/auth';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -21,17 +19,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    let settings = await db.query.adsenseSettings.findFirst({
-      where: eq(adsenseSettings.userId, session.userId),
-    });
+    await connectToMongo();
+
+    let settings = await AdsenseSettings.findOne({ userId: session.userId }).lean();
 
     // Create default settings if not exists
     if (!settings) {
       const verificationCode = uuidv4().replace(/-/g, '').substring(0, 16);
-      [settings] = await db.insert(adsenseSettings).values({
+      const created = await AdsenseSettings.create({
         userId: session.userId,
         verificationCode,
-      }).returning();
+      });
+      settings = created.toObject();
     }
 
     return NextResponse.json({ settings });
@@ -51,20 +50,21 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    await connectToMongo();
+
     const body = await request.json();
     const validated = updateAdsenseSchema.parse(body);
 
-    let settings = await db.query.adsenseSettings.findFirst({
-      where: eq(adsenseSettings.userId, session.userId),
-    });
+    let settings = await AdsenseSettings.findOne({ userId: session.userId }).lean();
 
     if (!settings) {
       const verificationCode = uuidv4().replace(/-/g, '').substring(0, 16);
-      [settings] = await db.insert(adsenseSettings).values({
+      const created = await AdsenseSettings.create({
         userId: session.userId,
         verificationCode,
         ...validated,
-      }).returning();
+      });
+      settings = created.toObject();
     } else {
       const updateData: Record<string, unknown> = { updatedAt: new Date() };
       
@@ -74,10 +74,11 @@ export async function PATCH(request: NextRequest) {
         }
       });
 
-      [settings] = await db.update(adsenseSettings)
-        .set(updateData)
-        .where(eq(adsenseSettings.userId, session.userId))
-        .returning();
+      settings = await AdsenseSettings.findOneAndUpdate(
+        { userId: session.userId },
+        { $set: updateData },
+        { new: true }
+      ).lean();
     }
 
     return NextResponse.json({

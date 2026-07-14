@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/db';
-import { campaigns } from '@/db/schema';
-import { desc, eq } from 'drizzle-orm';
+import { connectToMongo, Campaign, Pixel } from '@/db/mongo';
 import { getSession, requireRole } from '@/lib/auth';
 import { ensureCampaignWorkflowSchema } from '@/lib/feature-schema';
 
@@ -12,19 +10,21 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    await connectToMongo();
     await ensureCampaignWorkflowSchema();
 
-    const whereClause = session.role === 'admin'
-      ? undefined
-      : eq(campaigns.advertiserId, session.userId);
+    const filter: any = session.role === 'admin' ? {} : { advertiserId: session.userId };
 
-    const campaignPixels = await db.query.campaigns.findMany({
-      where: whereClause,
-      with: {
-        pixels: true,
-      },
-      orderBy: [desc(campaigns.createdAt)],
-    });
+    const campaigns = await Campaign.find(filter).sort({ createdAt: -1 }).lean();
+    const campaignIds = campaigns.map((c: any) => c._id);
+
+    const pixels = await Pixel.find({ campaignId: { $in: campaignIds } }).lean();
+
+    // Attach pixels to campaigns
+    const campaignPixels = campaigns.map((campaign: any) => ({
+      ...campaign,
+      pixels: pixels.filter((p: any) => String(p.campaignId) === String(campaign._id)),
+    }));
 
     return NextResponse.json({ campaigns: campaignPixels });
   } catch (error) {

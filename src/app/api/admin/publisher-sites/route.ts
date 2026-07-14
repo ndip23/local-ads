@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/db';
-import { publisherSites } from '@/db/schema';
-import { desc } from 'drizzle-orm';
 import { getSession, requireRole } from '@/lib/auth';
+import { connectToMongo, PublisherSite, User, PublisherProfile } from '@/db/mongo';
 
 function includesSearch(value: string | null | undefined, search: string): boolean {
   return Boolean(value?.toLowerCase().includes(search));
@@ -20,21 +18,21 @@ export async function GET(request: NextRequest) {
     const accountStatus = searchParams.get('accountStatus');
     const search = searchParams.get('search')?.trim().toLowerCase() || '';
 
-    const sites = await db.query.publisherSites.findMany({
-      with: {
-        user: {
-          columns: {
-            passwordHash: false,
-          },
-          with: {
-            publisherProfile: true,
-          },
-        },
-      },
-      orderBy: [desc(publisherSites.createdAt)],
-    });
+    await connectToMongo();
+    const sites = await PublisherSite.find({}).sort({ createdAt: -1 }).lean();
 
-    const filteredSites = sites.filter((site) => {
+    // Populate user and publisher profile for filtering and display
+    const userIds = sites.map((s: any) => s.userId).filter(Boolean);
+    const users = await User.find({ _id: { $in: userIds } }).lean();
+    const profiles = await PublisherProfile.find({ userId: { $in: userIds } }).lean();
+
+    const sitesWithUser = sites.map((site: any) => ({
+      ...site,
+      user: users.find((u: any) => String(u._id) === String(site.userId)) || null,
+      userPublisherProfile: profiles.find((p: any) => String(p.userId) === String(site.userId)) || null,
+    }));
+
+    const filteredSites = sitesWithUser.filter((site: any) => {
       if (verification === 'pending' && site.verified) return false;
       if (verification === 'verified' && !site.verified) return false;
       if (accountStatus && site.user?.status !== accountStatus) return false;
@@ -47,7 +45,7 @@ export async function GET(request: NextRequest) {
         includesSearch(site.name, search) ||
         includesSearch(site.user?.email, search) ||
         includesSearch(userName, search) ||
-        includesSearch(site.user?.publisherProfile?.websiteUrl, search)
+        includesSearch(site.userPublisherProfile?.websiteUrl, search)
       );
     });
 
